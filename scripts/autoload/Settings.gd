@@ -17,6 +17,11 @@ var data := {
 	"invert_y": false,
 	"cam_distance": 4.2,
 	"show_damage_numbers": true,
+	"vol_master": 0.8,
+	"vol_music": 0.7,
+	"vol_ambience": 0.6,
+	"vol_sfx": 0.8,
+	"vol_ui": 0.6,
 }
 
 const QUALITY_NAMES := ["Low", "Medium", "High", "Ultra"]

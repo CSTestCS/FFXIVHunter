@@ -1,24 +1,18 @@
 class_name CharacterModel
 extends Node3D
-## A humanoid character built from a VRM file at runtime.
-##
-## Model lookup order (first file found wins) in each CustomModels folder
-## (next to the .exe, then %APPDATA%/AetherHunter/CustomModels):
-##   outfits/<race>_<body>_<outfit>.vrm  -> full model wearing that outfit (VRoid export)
-##   outfits/<outfit>_<body>.vrm         -> same, any race
-##   bodies/<race>_<body>.vrm            -> race-specific base body (race ears/tails assumed included)
-##   bodies/<body>.vrm                   -> base body for every race
-## Otherwise the bundled placeholder (models/placeholder/body_<body>.vrm) is used.
-## See docs/CUSTOM_MODELS.md for the full guide.
+## A humanoid character assembled at runtime from built-in VRM files (see ModelLibrary and
+## docs/MODELS.md): a naked base body chosen by race / clan / body type / variant, plus gear and
+## hair overlays whose skinned meshes are re-bound to the body skeleton by bone name.
+## Without supplied models it falls back to the generated placeholder body, which is painted with
+## the gear colours, and to procedural hair / race features / armor parts.
 
 const BodyShader := preload("res://shaders/placeholder_body.gdshader")
 const REGION_KEYS := ["head", "neck", "torso", "uarm", "larm", "hand", "pelvis", "thigh", "shin", "foot", "bust"]
 const RacesData := preload("res://scripts/data/races.gd")
-
-static var _templates := {}
+const ItemsData := preload("res://scripts/data/items.gd")
 
 var look: Dictionary = {}
-var outfit := "none"
+var gear: Dictionary = {}           # slot -> gear piece id ("" = empty)
 var visual: Node3D
 var model: Node3D
 var skel: Skeleton3D
@@ -27,6 +21,7 @@ var bone_map := {}
 var skel_to_char := Transform3D()
 var placeholder := true
 var race_parts_included := false
+var body_path := ""
 var meshes: Array[MeshInstance3D] = []
 var body_mat: ShaderMaterial
 var unit := 1.0              # model scale factor (head height / placeholder head height)
@@ -35,7 +30,9 @@ var weapon_kind := ""
 var weapon_tier := 0
 var sheathed := false
 var _weapon_nodes: Array[Node3D] = []
-var _armor_nodes: Array[Node3D] = []
+var _gear_nodes: Array[Node] = []
+var _hair_nodes: Array[Node] = []
+var _overlaid := {}          # slot -> true when that slot is shown by a VRM overlay
 var _sockets := {}
 var _tail: Node3D
 var _eyes: Array[Node3D] = []
@@ -44,35 +41,41 @@ var _extras := {"_lie": 0.0, "_roll": 0.0, "_pitch": 0.0, "_spin": 0.0}
 var _blink := 3.0
 var _vis_scale := 1.0
 
-func build(p_look: Dictionary, p_outfit := "none", p_weapon := "", p_tier := 0) -> void:
+## gear_or_set: a slot -> piece dictionary, or a gear set id (dresses every slot from that set).
+func build(p_look: Dictionary, gear_or_set: Variant = {}, p_weapon := "", p_tier := 0) -> void:
 	look = p_look
-	outfit = p_outfit
+	gear = DB.set_gear(gear_or_set) if gear_or_set is String else (gear_or_set as Dictionary).duplicate()
 	weapon_kind = p_weapon
 	weapon_tier = p_tier
 	for c in get_children():
 		c.queue_free()
 	_sockets.clear()
 	_weapon_nodes.clear()
-	_armor_nodes.clear()
+	_gear_nodes.clear()
+	_hair_nodes.clear()
+	_overlaid.clear()
 	_eyes.clear()
 	meshes.clear()
+	_tail = null
 	visual = Node3D.new()
 	visual.name = "Visual"
 	add_child(visual)
-	var path := _pick_model_path()
-	var tpl := _load_template(path)
+	body_path = _pick_body()
+	var tpl := ModelLibrary.load_template(body_path)
 	if tpl == null:
-		tpl = _load_template(_placeholder_path())
+		body_path = ModelLibrary.placeholder(look.get("body", "feminine"))
+		placeholder = true
+		race_parts_included = false
+		tpl = ModelLibrary.load_template(body_path)
 	model = tpl.duplicate() as Node3D
 	visual.add_child(model)
 	var sk := model.find_children("*", "Skeleton3D", true, false)
 	skel = sk[0] if sk.size() > 0 else null
 	if skel == null:
-		push_error("Model has no skeleton: " + path)
+		push_error("Model has no skeleton: " + body_path)
 		return
 	for m in model.find_children("*", "MeshInstance3D", true, false):
 		meshes.append(m)
-		(m as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	bone_map = HumanoidAnimator.build_map(skel, tpl.get_meta("vrm_bones", {}))
 	skel_to_char = _relative_xform(skel, visual)
 	# Face -Z like every other node in the game (VRM 1.0 / some exporters face +Z).
@@ -95,94 +98,31 @@ func build(p_look: Dictionary, p_outfit := "none", p_weapon := "", p_tier := 0) 
 	height_m = RacesData.height_cm(look) / 100.0
 	_vis_scale = height_m / base_h
 	visual.scale = Vector3.ONE * _vis_scale
-	if bone_map.has("head"):
+	if bone_map.has("head") and not race_parts_included:
 		var hs: float = DB.races.get(look.race, {}).get("head_scale", 1.0)
 		skel.set_bone_pose_scale(bone_map.head, Vector3.ONE * hs)
-	_apply_materials()
-	_apply_morphs()
+	_apply_body_materials()
+	_apply_morphs(meshes)
 	if placeholder:
 		_add_face()
-	if placeholder:
-		_add_hair()
+	_add_hair()
 	if not race_parts_included:
 		_add_race_parts()
-	_build_armor_parts()
+	_build_gear()
 	_build_weapon()
 
-# ------------------------------------------------------------------ model loading
-static func custom_dirs() -> Array:
-	var dirs := []
-	if not OS.has_feature("editor"):
-		dirs.append(OS.get_executable_path().get_base_dir().path_join("CustomModels"))
-	dirs.append(ProjectSettings.globalize_path("user://CustomModels"))
-	return dirs
-
-static func find_custom(candidates: Array) -> String:
-	for d in custom_dirs():
-		for c in candidates:
-			var p: String = d.path_join(c)
-			if FileAccess.file_exists(p):
-				return p
-	return ""
-
-func _placeholder_path() -> String:
-	return "res://models/placeholder/body_%s.vrm" % look.get("body", "feminine")
-
-func _pick_model_path() -> String:
+func _pick_body() -> String:
 	var race: String = look.get("race", "hume")
 	var body: String = look.get("body", "feminine")
+	var variants := ModelLibrary.body_variants(race, look.get("clan", ""), body)
+	if variants.is_empty():
+		placeholder = true
+		race_parts_included = false
+		return ModelLibrary.placeholder(body)
 	placeholder = false
-	race_parts_included = false
-	var p := find_custom(["outfits/%s_%s_%s.vrm" % [race, body, outfit]])
-	if p != "":
-		race_parts_included = true
-		return p
-	p = find_custom(["outfits/%s_%s.vrm" % [outfit, body]])
-	if p != "":
-		return p
-	p = find_custom(["bodies/%s_%s.vrm" % [race, body]])
-	if p != "":
-		race_parts_included = true
-		return p
-	p = find_custom(["bodies/%s.vrm" % body])
-	if p != "":
-		return p
-	placeholder = true
-	return _placeholder_path()
-
-static func _load_template(path: String) -> Node3D:
-	if _templates.has(path):
-		return _templates[path]
-	var doc := GLTFDocument.new()
-	var st := GLTFState.new()
-	var err := doc.append_from_file(path, st)
-	if err != OK:
-		push_warning("Could not load model %s (error %d)" % [path, err])
-		_templates[path] = null
-		return null
-	var scene := doc.generate_scene(st) as Node3D
-	# VRM humanoid bone mapping (0.x: extensions.VRM, 1.0: extensions.VRMC_vrm)
-	var names := {}
-	var js: Dictionary = st.json
-	var nodes: Array = js.get("nodes", [])
-	var ext: Dictionary = js.get("extensions", {})
-	var version := 0
-	if ext.has("VRM"):
-		for hb in ext.VRM.get("humanoid", {}).get("humanBones", []):
-			var ni := int(hb.get("node", -1))
-			if ni >= 0 and ni < nodes.size():
-				names[hb.bone] = String(nodes[ni].get("name", ""))
-	elif ext.has("VRMC_vrm"):
-		version = 1
-		var hbs: Dictionary = ext.VRMC_vrm.get("humanoid", {}).get("humanBones", {})
-		for b in hbs:
-			var ni := int(hbs[b].get("node", -1))
-			if ni >= 0 and ni < nodes.size():
-				names[b] = String(nodes[ni].get("name", ""))
-	scene.set_meta("vrm_bones", names)
-	scene.set_meta("vrm_version", version)
-	_templates[path] = scene
-	return scene
+	var path: String = variants[clampi(int(look.get("model_variant", 0)), 0, variants.size() - 1)]
+	race_parts_included = ModelLibrary.is_race_specific(path, race)
+	return path
 
 static func _relative_xform(node: Node3D, root: Node) -> Transform3D:
 	var x := Transform3D()
@@ -194,7 +134,7 @@ static func _relative_xform(node: Node3D, root: Node) -> Transform3D:
 	return x
 
 # ------------------------------------------------------------------ materials
-func _apply_materials() -> void:
+func _apply_body_materials() -> void:
 	var skin := RacesData.skin_color(look)
 	if placeholder:
 		body_mat = ShaderMaterial.new()
@@ -208,35 +148,151 @@ func _apply_materials() -> void:
 		if bone_map.has("head"):
 			var hb := skel.get_bone_global_rest(bone_map.head).origin
 			body_mat.set_shader_parameter("head_center", hb + Vector3(0, 0.095, -0.008) * unit)
-		_apply_outfit_colors()
 		for m in meshes:
 			m.material_override = body_mat
 	else:
-		# Custom VRoid model: keep its textures, tint by VRoid material naming, make it PBR.
-		for m in meshes:
-			for si in range(m.mesh.get_surface_count()):
-				var mat := m.get_active_material(si)
-				if mat is BaseMaterial3D:
-					var nm := (mat.resource_name as String).to_upper()
-					var dup := (mat as BaseMaterial3D).duplicate() as BaseMaterial3D
-					dup.roughness = maxf(dup.roughness, 0.55)
-					dup.metallic = 0.0
-					if "HAIR" in nm:
-						dup.albedo_color = Color(look.get("hair_color", "#ffffff")).lightened(0.25)
-					elif "SKIN" in nm or "FACE" in nm or "BODY" in nm:
-						dup.albedo_color = skin.lightened(0.15)
-					elif "IRIS" in nm or "EYE_IRIS" in nm:
-						dup.albedo_color = Color(look.get("eye_color", "#ffffff")).lightened(0.3)
-					if dup.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
-						dup.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
-						dup.alpha_scissor_threshold = 0.5
-					m.set_surface_override_material(si, dup)
+		body_mat = null
+		_convert_materials(meshes)
 
-func _apply_outfit_colors() -> void:
-	if not body_mat:
+## Make VRoid/MToon fallback materials PBR, keep textures, tint by VRoid material naming.
+func _convert_materials(list: Array, tint_all_hair := false) -> void:
+	var skin := RacesData.skin_color(look)
+	for m in list:
+		var mi := m as MeshInstance3D
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		for si in range(mi.mesh.get_surface_count()):
+			var mat := mi.get_active_material(si)
+			if not (mat is BaseMaterial3D):
+				continue
+			var nm := (mat.resource_name as String).to_upper()
+			var dup := (mat as BaseMaterial3D).duplicate() as BaseMaterial3D
+			dup.roughness = maxf(dup.roughness, 0.55)
+			dup.metallic = minf(dup.metallic, 0.2)
+			if tint_all_hair or "HAIR" in nm:
+				dup.albedo_color = Color(look.get("hair_color", "#ffffff")).lightened(0.25)
+			elif "SKIN" in nm or "FACE" in nm or "BODY" in nm:
+				dup.albedo_color = skin.lightened(0.15)
+			elif "IRIS" in nm:
+				dup.albedo_color = Color(look.get("eye_color", "#ffffff")).lightened(0.3)
+			if dup.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
+				dup.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+				dup.alpha_scissor_threshold = 0.5
+			mi.set_surface_override_material(si, dup)
+
+func set_bruised(v: float) -> void:
+	if body_mat:
+		body_mat.set_shader_parameter("bruise", v)
+
+func _apply_morphs(list: Array) -> void:
+	for m in list:
+		var mi := m as MeshInstance3D
+		for pair in [["Bust", float(look.get("bust", 0.5))], ["Muscle", float(look.get("muscle", 0.3))], ["Weight", float(look.get("weight", 0.3))]]:
+			var idx := mi.find_blend_shape_by_name(pair[0])
+			if idx >= 0:
+				mi.set_blend_shape_value(idx, pair[1])
+
+# ------------------------------------------------------------------ overlays (gear / hair VRMs)
+## Instances a VRM/glTF and moves its meshes onto this body's skeleton. Skinned meshes are
+## re-bound bone-by-bone using humanoid names (so VRoid J_Bip names or VRM humanoid maps both work).
+func _attach_overlay(path: String, store: Array, hair := false) -> bool:
+	var tpl := ModelLibrary.load_template(path)
+	if tpl == null or skel == null:
+		return false
+	var inst := tpl.duplicate() as Node3D
+	var src_map := {}
+	var src_sk := inst.find_children("*", "Skeleton3D", true, false)
+	var src_skel: Skeleton3D = src_sk[0] if src_sk.size() > 0 else null
+	if src_skel:
+		var hm := HumanoidAnimator.build_map(src_skel, tpl.get_meta("vrm_bones", {}))
+		for h in hm:
+			src_map[src_skel.get_bone_name(hm[h])] = h
+	var added := []
+	for mnode in inst.find_children("*", "MeshInstance3D", true, false):
+		var mi := mnode as MeshInstance3D
+		var xf := _relative_xform(mi, src_skel) if src_skel else Transform3D()
+		mi.get_parent().remove_child(mi)
+		mi.owner = null
+		skel.add_child(mi)
+		mi.transform = xf
+		if mi.skin and src_skel:
+			var ns := Skin.new()
+			for i in range(mi.skin.get_bind_count()):
+				var bname := String(mi.skin.get_bind_name(i))
+				if bname == "":
+					bname = src_skel.get_bone_name(mi.skin.get_bind_bone(i))
+				if src_map.has(bname) and bone_map.has(src_map[bname]):
+					bname = skel.get_bone_name(bone_map[src_map[bname]])
+				ns.add_named_bind(bname, mi.skin.get_bind_pose(i))
+			mi.skin = ns
+			mi.skeleton = NodePath("..")
+		elif not mi.skin:
+			# rigid piece: follow the head (hair/hats) or hips
+			skel.remove_child(mi)
+			var s := socket("head" if hair else "hips")
+			if s == null:
+				mi.queue_free()
+				continue
+			s.add_child(mi)
+			mi.transform = Transform3D(Basis().scaled(Vector3.ONE * (1.0 / maxf(_vis_scale, 0.001))), Vector3.ZERO) * xf
+		added.append(mi)
+		store.append(mi)
+	inst.queue_free()
+	_convert_materials(added, hair)
+	_apply_morphs(added)
+	return not added.is_empty()
+
+# ------------------------------------------------------------------ gear
+func set_gear(p_gear: Dictionary) -> void:
+	if p_gear == gear:
 		return
-	var a: Dictionary = DB.armor.get(outfit, DB.armor.none)
-	var cols: Dictionary = a.colors
+	gear = p_gear.duplicate()
+	if skel:
+		_build_gear()
+
+func _build_gear() -> void:
+	for n in _gear_nodes:
+		if is_instance_valid(n):
+			n.queue_free()
+	_gear_nodes.clear()
+	_overlaid.clear()
+	var race: String = look.get("race", "hume")
+	var body: String = look.get("body", "feminine")
+	for slot in ItemsData.GEAR_SLOTS:
+		var pid: String = gear.get(slot, "")
+		if pid == "":
+			continue
+		var path := ModelLibrary.gear_model(pid, race, body)
+		if path != "" and _attach_overlay(path, _gear_nodes):
+			_overlaid[slot] = true
+	if placeholder:
+		_paint_gear()
+	_build_gear_parts()
+
+func _set_of(slot: String) -> Dictionary:
+	var pid: String = gear.get(slot, "")
+	if pid == "" or not DB.gear.has(pid):
+		return {}
+	return DB.gear_sets[DB.gear[pid].set]
+
+func _paint_gear() -> void:
+	var cols := {}
+	var rough := 0.85
+	var metal := 0.0
+	for slot in ItemsData.GEAR_SLOTS:
+		var st := _set_of(slot)
+		if st.is_empty() or _overlaid.has(slot):
+			continue
+		for r in ItemsData.SLOT_INFO[slot].regions:
+			var c: String = st.colors.get(r, "")
+			if c != "":
+				cols[r] = c
+		if slot in ["body", "legs"]:
+			rough = float(st.get("rough", rough))
+			metal = maxf(metal, float(st.get("metal", 0.0)))
+	if _set_of("body").is_empty() and not cols.has("bust"):
+		cols["bust"] = ItemsData.UNDERWEAR.bust
+	if _set_of("legs").is_empty() and not cols.has("pelvis"):
+		cols["pelvis"] = ItemsData.UNDERWEAR.pelvis
 	var arr := PackedVector4Array()
 	for k in REGION_KEYS:
 		var c: String = cols.get(k, "")
@@ -246,30 +302,8 @@ func _apply_outfit_colors() -> void:
 			var col := Color(c).srgb_to_linear()
 			arr.append(Vector4(col.r, col.g, col.b, 1.0))
 	body_mat.set_shader_parameter("region_colors", arr)
-	body_mat.set_shader_parameter("cloth_rough", float(a.get("rough", 0.85)))
-	body_mat.set_shader_parameter("cloth_metal", float(a.get("metal", 0.0)))
-
-func set_bruised(v: float) -> void:
-	if body_mat:
-		body_mat.set_shader_parameter("bruise", v)
-
-func set_outfit(id: String) -> void:
-	if id == outfit:
-		return
-	outfit = id
-	var custom_outfit := find_custom(["outfits/%s_%s_%s.vrm" % [look.get("race", ""), look.get("body", ""), id], "outfits/%s_%s.vrm" % [id, look.get("body", "")]])
-	if not placeholder or custom_outfit != "":
-		build(look, id, weapon_kind, weapon_tier)
-		return
-	_apply_outfit_colors()
-	_build_armor_parts()
-
-func _apply_morphs() -> void:
-	for m in meshes:
-		for pair in [["Bust", float(look.get("bust", 0.5))], ["Muscle", float(look.get("muscle", 0.3))], ["Weight", float(look.get("weight", 0.3))]]:
-			var idx := m.find_blend_shape_by_name(pair[0])
-			if idx >= 0:
-				m.set_blend_shape_value(idx, pair[1])
+	body_mat.set_shader_parameter("cloth_rough", rough)
+	body_mat.set_shader_parameter("cloth_metal", metal)
 
 # ------------------------------------------------------------------ sockets & parts
 ## A node that follows a humanoid bone. `offset` is in character space relative to the bone, T-pose.
@@ -345,21 +379,20 @@ func _add_face() -> void:
 			hs.add_child(e)
 
 func _add_hair() -> void:
+	var hair_id: String = look.get("hair", "crop")
+	var path := ModelLibrary.hair_model(hair_id, look.get("body", "feminine"))
+	if path != "" and _attach_overlay(path, _hair_nodes, true):
+		return
+	if not placeholder:
+		return  # supplied bodies without a matching hair file keep whatever hair they have
 	var hs := _head_socket()
 	if hs == null:
 		return
-	var custom := find_custom(["hair/%s.glb" % look.get("hair", ""), "hair/%s.vrm" % look.get("hair", "")])
-	var mat := PartsBuilder.hair_material(Color(look.get("hair_color", "#3b2a20")), Color(look.get("highlight_color", "#b98a52")), bool(look.get("highlights", false)))
-	if custom != "":
-		var tpl := _load_template(custom)
-		if tpl:
-			var h := tpl.duplicate() as Node3D
-			hs.add_child(h)
-			return
 	var hair := MeshInstance3D.new()
-	hair.mesh = PartsBuilder.hair_mesh(look.get("hair", "crop"))
-	hair.material_override = mat
+	hair.mesh = PartsBuilder.hair_mesh(hair_id)
+	hair.material_override = PartsBuilder.hair_material(Color(look.get("hair_color", "#3b2a20")), Color(look.get("highlight_color", "#b98a52")), bool(look.get("highlights", false)))
 	hs.add_child(hair)
+	_hair_nodes.append(hair)
 
 func _add_race_parts() -> void:
 	var r: Dictionary = DB.races.get(look.race, DB.races.hume)
@@ -392,37 +425,43 @@ func _add_race_parts() -> void:
 			tm.material_override = MeshKit.pbr(Color(look.get("scale_color", "#6b4a2a")), 0.45) if style == "dragon" else PartsBuilder.hair_material(hair_col, hair_col.lightened(0.2), false)
 			_tail.add_child(tm)
 
-func _build_armor_parts() -> void:
-	for n in _armor_nodes:
-		n.queue_free()
-	_armor_nodes.clear()
-	if not placeholder:
-		return
-	var a: Dictionary = DB.armor.get(outfit, DB.armor.none)
-	var parts: Array = a.get("parts", [])
-	if parts.is_empty():
-		return
-	var cols: Dictionary = a.colors
-	var main := MeshKit.pbr(Color(cols.get("torso", "#6b4a2e")).darkened(0.15), float(a.get("rough", 0.6)), float(a.get("metal", 0.0)))
-	var leather := MeshKit.pbr(Color("3a2618"), 0.65)
+## Procedural extras for placeholder gear: belts, bracers, pauldrons, capes and headwear.
+func _build_gear_parts() -> void:
 	var u := Basis().scaled(Vector3.ONE * unit)
-	for p in parts:
-		match p:
-			"belt", "sash":
-				_part("hips", PartsBuilder.armor_piece(p), Transform3D(u, Vector3(0, 0.04, 0) * unit), leather if p == "belt" else MeshKit.pbr(Color(cols.get("pelvis", "#8c2f2f")), 0.7))
-			"bracers":
-				_part("leftLowerArm", PartsBuilder.armor_piece("bracer"), Transform3D(u.rotated(Vector3.UP, PI), Vector3(-0.08, 0, 0) * unit), leather)
-				_part("rightLowerArm", PartsBuilder.armor_piece("bracer"), Transform3D(u, Vector3(0.08, 0, 0) * unit), leather)
-			"pauldrons_light", "pauldrons_heavy":
-				var kind := "pauldron_light" if p == "pauldrons_light" else "pauldron_heavy"
-				_part("leftUpperArm", PartsBuilder.armor_piece(kind), Transform3D(u, Vector3(-0.01, 0.02, 0) * unit), main)
-				_part("rightUpperArm", PartsBuilder.armor_piece(kind), Transform3D(u, Vector3(0.01, 0.02, 0) * unit), main)
-			"mantle":
-				_part("upperChest", PartsBuilder.armor_piece("mantle"), Transform3D(u, Vector3(0, 0.08, 0.0) * unit), main)
-			"hood_cape":
-				_part("upperChest", PartsBuilder.armor_piece("cape"), Transform3D(u, Vector3(0, 0.1, 0.0) * unit), main)
-			"coat_tails":
-				_part("hips", PartsBuilder.armor_piece("coat_tails"), Transform3D(u, Vector3(0, 0.02, 0) * unit), main)
+	var st := _set_of("body")
+	if not st.is_empty() and not _overlaid.has("body"):
+		var cols: Dictionary = st.colors
+		var main := MeshKit.pbr(Color(cols.get("torso", "#6b4a2e")).darkened(0.15), float(st.get("rough", 0.6)), float(st.get("metal", 0.0)))
+		var leather := MeshKit.pbr(Color("3a2618"), 0.65)
+		for p in st.get("parts", []):
+			match p:
+				"belt", "sash":
+					_part("hips", PartsBuilder.armor_piece(p), Transform3D(u, Vector3(0, 0.04, 0) * unit), leather if p == "belt" else MeshKit.pbr(Color(cols.get("pelvis", "#8c2f2f")), 0.7))
+				"bracers":
+					if not _overlaid.has("hands"):
+						_part("leftLowerArm", PartsBuilder.armor_piece("bracer"), Transform3D(u.rotated(Vector3.UP, PI), Vector3(-0.08, 0, 0) * unit), leather)
+						_part("rightLowerArm", PartsBuilder.armor_piece("bracer"), Transform3D(u, Vector3(0.08, 0, 0) * unit), leather)
+				"pauldrons_light", "pauldrons_heavy":
+					var kind := "pauldron_light" if p == "pauldrons_light" else "pauldron_heavy"
+					_part("leftUpperArm", PartsBuilder.armor_piece(kind), Transform3D(u, Vector3(-0.01, 0.02, 0) * unit), main)
+					_part("rightUpperArm", PartsBuilder.armor_piece(kind), Transform3D(u, Vector3(0.01, 0.02, 0) * unit), main)
+				"mantle":
+					_part("upperChest", PartsBuilder.armor_piece("mantle"), Transform3D(u, Vector3(0, 0.08, 0.0) * unit), main)
+				"hood_cape":
+					_part("upperChest", PartsBuilder.armor_piece("cape"), Transform3D(u, Vector3(0, 0.1, 0.0) * unit), main)
+				"coat_tails":
+					_part("hips", PartsBuilder.armor_piece("coat_tails"), Transform3D(u, Vector3(0, 0.02, 0) * unit), main)
+	var hs := _set_of("head")
+	if not hs.is_empty() and not _overlaid.has("head") and hs.get("head", "") != "":
+		var hcol := Color(hs.colors.get("torso", "#6b4a2e"))
+		var mat := MeshKit.pbr(hcol.darkened(0.1), float(hs.get("rough", 0.7)), float(hs.get("metal", 0.0)))
+		var s := _head_socket()
+		if s:
+			var mi := MeshInstance3D.new()
+			mi.mesh = PartsBuilder.headwear(hs.head)
+			mi.material_override = mat
+			s.add_child(mi)
+			_gear_nodes.append(mi)
 
 func _part(h: String, mesh: Mesh, off: Transform3D, mat: Material) -> void:
 	var s := socket(h)
@@ -433,7 +472,7 @@ func _part(h: String, mesh: Mesh, off: Transform3D, mat: Material) -> void:
 	mi.material_override = mat
 	mi.transform = off
 	s.add_child(mi)
-	_armor_nodes.append(mi)
+	_gear_nodes.append(mi)
 
 func set_weapon(kind: String, tier: int) -> void:
 	weapon_kind = kind

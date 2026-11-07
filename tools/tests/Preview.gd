@@ -33,7 +33,7 @@ func _ready() -> void:
 	rng.seed = 5
 	var looks := []
 	var jobs := ["paladin", "warrior", "lancer", "ranger", "sorcerer", "samurai"]
-	var outfits := ["none", "simple_tunic", "plate_set", "ranger_garb", "scholar_robes", "desert_silks"]
+	var outfits := ["leather_set", "simple_tunic", "plate_set", "ranger_garb", "scholar_robes", "desert_silks"]
 	var races := ["hume", "aelith", "ferran", "draeki", "leporin", "tharn"]
 	var cams := []
 	for i in range(6):

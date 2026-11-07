@@ -245,6 +245,9 @@ func engage(t: Actor) -> void:
 		if is_large and not engaged:
 			engaged = true
 			world.on_large_engaged(self)
+			Audio.sfx("roar_large", center(), 4.0)
+		elif not is_large and randf() < 0.5:
+			Audio.sfx("growl" if data.body != "humanoid" else "jump", center(), -4.0, 0.2)
 	# packs help each other
 	for e in world.enemies:
 		if e != self and e.id == id and e.ai in ["idle", "wander"] and e.global_position.distance_to(global_position) < 18.0:
@@ -295,6 +298,10 @@ func _begin(m: Dictionary) -> void:
 	if shape != "none":
 		tele = world.spawn_telegraph(shape, m)
 		_update_tele_xform()
+		if is_large:
+			Audio.sfx("telegraph", atk_origin, -4.0, 0.0)
+	if is_large and randf() < 0.4:
+		Audio.sfx("growl", center(), 0.0, 0.15)
 
 func _update_tele_xform() -> void:
 	if tele == null:
@@ -316,6 +323,9 @@ func _shape_origin() -> Vector3:
 	return global_position
 
 func _on_active_start() -> void:
+	var snd: String = {"bite": "bite", "lunge": "bite", "slam": "slam", "overhead": "swing_heavy", "slash": "swing_light", "spin": "swing_heavy", "tail": "swing_heavy",
+		"charge": "charge", "breath": "breath", "roar": "roar_large" if is_large else "roar_small", "leap": "slam", "dive": "splash", "burrow": "slam", "projectile": "cast"}.get(mv.anim, "whoosh")
+	Audio.sfx(snd, center(), 2.0 if is_large else -2.0)
 	match mv.anim:
 		"projectile":
 			world.spawn_vfx("orb_fall", atk_target, float(mv.get("radius", 2.5)))
@@ -387,6 +397,7 @@ func on_hit(_dmg: float, info: Dictionary) -> void:
 
 func on_death(_info: Dictionary) -> void:
 	ai = "dead"
+	Audio.sfx("monster_die", center(), 2.0 if is_large else -3.0)
 	if tele:
 		tele.queue_free()
 		tele = null

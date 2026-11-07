@@ -42,6 +42,7 @@ func _ready() -> void:
 	info.custom_minimum_size = Vector2(940, 0)
 	v.add_child(info)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	Audio.ui("ui_open")
 	_rebuild()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -50,6 +51,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_close()
 
 func _close() -> void:
+	Audio.ui("ui_cancel")
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	closed.emit()
 	queue_free()
@@ -153,34 +155,33 @@ func _smith() -> void:
 				Game.notify.emit("Forged: " + DB.weapon_name(jj, tier + 1))
 				_rebuild(), can]])
 		_text("    %s → %s   ATK %d → %d   |  %d gil, %s" % [nm, DB.weapon_name(j, tier + 1), int(DB.weapon_attack(j, tier)), int(DB.weapon_attack(j, tier + 1)), int(nxt.gil), ", ".join(mats)], 17, UIKit.DIM)
-	_text("Armor", 24, UIKit.GOLD)
-	for a in Game.state.armor_owned:
-		if a == "none":
-			continue
-		var t := int(Game.state.armor_owned[a].tier)
+	_text("Gear", 24, UIKit.GOLD)
+	for pid in Game.state.gear_owned:
+		var t := int(Game.state.gear_owned[pid].tier)
+		var gd: Dictionary = DB.gear[pid]
 		if t >= 3:
-			_text("%s  (+%d, max)" % [DB.armor[a].name, t])
+			_text("%s  (+%d, max)" % [gd.name, t])
 			continue
-		var cost := (t + 1) * 500 + int(DB.armor[a].def) * 40
-		var need := {"beast_hide": 2 + t, "iron_ore": 2 + t} if t < 2 else {"steel_ingot": 3, "drake_scale": 1}
+		var cost := (t + 1) * 200 + int(float(gd.def) * 60.0)
+		var need := {"beast_hide": 1 + t, "iron_ore": 1 + t} if t < 2 else {"steel_ingot": 2, "drake_scale": 1}
 		var ok := int(Game.state.gil) >= cost
 		var desc := []
 		for m in need:
 			desc.append("%s %d/%d" % [DB.item_name(m), Game.count(m), need[m]])
 			if Game.count(m) < need[m]:
 				ok = false
-		var aa: String = a
-		_row([["Reinforce %s +%d" % [DB.armor[a].name, t + 1], func():
+		var pp: String = pid
+		_row([["Reinforce %s +%d" % [gd.name, t + 1], func():
 			if Game.spend_gil(cost):
 				for m in need:
 					Game.remove_item(m, need[m])
-				Game.state.armor_owned[aa].tier = t + 1
+				Game.state.gear_owned[pp].tier = t + 1
 				_rebuild(), ok]])
 		_text("    %d gil, %s  (+25%% defense per level)" % [cost, ", ".join(desc)], 17, UIKit.DIM)
 
 func _materia() -> void:
 	title.text = "Materia Workshop  —  " + _npc_name()
-	_text("Buy materia, then meld it into a slot. Weapons (per job) have 2 slots, armor sets have 3. Melding over a slot destroys the old materia.", 18, UIKit.DIM)
+	_text("Buy materia, then meld it into a slot. Weapons (per job) have 2 slots, body gear 2, other gear 1. Melding over a slot destroys the old materia.", 18, UIKit.DIM)
 	var h := HFlowContainer.new()
 	body.add_child(h)
 	for id in DB.materia:
@@ -199,13 +200,15 @@ func _materia() -> void:
 	var slots := []
 	for i in range(2):
 		slots.append(["weapon", i, Game.state.weapons[job].materia[i]])
-	var arm: String = Game.state.armor
-	if arm != "none":
-		for i in range(3):
-			slots.append(["armor", i, Game.state.armor_owned[arm].materia[i]])
+	for slot in Game.state.gear:
+		var pid: String = Game.state.gear[slot]
+		if pid != "":
+			var gm: Array = Game.state.gear_owned[pid].materia
+			for i in range(gm.size()):
+				slots.append([pid, i, gm[i]])
 	for s in slots:
 		var cur: String = s[2]
-		var label := "%s slot %d: %s" % ["Weapon (%s)" % DB.jobs[job].name if s[0] == "weapon" else DB.armor[arm].name, int(s[1]) + 1, DB.materia[cur].name if cur != "" else "(empty)"]
+		var label := "%s slot %d: %s" % ["Weapon (%s)" % DB.jobs[job].name if s[0] == "weapon" else DB.gear[s[0]].name, int(s[1]) + 1, DB.materia[cur].name if cur != "" else "(empty)"]
 		_text(label, 19, UIKit.TEXT)
 		var row := HFlowContainer.new()
 		body.add_child(row)
@@ -216,34 +219,56 @@ func _materia() -> void:
 				if target[0] == "weapon":
 					Game.state.weapons[job].materia[target[1]] = id
 				else:
-					Game.state.armor_owned[arm].materia[target[1]] = id
+					Game.state.gear_owned[target[0]].materia[target[1]] = id
 				Game.notify.emit("Melded " + DB.materia[id].name)
 				_rebuild(), 260)
 			row.add_child(b)
 
 func _outfitter() -> void:
 	title.text = "Armorer & Outfitter  —  " + _npc_name()
-	_text("Buy armor sets and choose what you wear. (Custom clothing models replace these visuals by armor id; see docs/CUSTOM_MODELS.md.)", 18, UIKit.DIM)
-	for a in DB.armor:
-		var d: Dictionary = DB.armor[a]
-		if d.get("hidden", false) and a != "none":
+	_text("Gear is worn per slot: head, body, hands, legs, feet. Buy single pieces or a whole set.", 18, UIKit.DIM)
+	for set_id in DB.gear_sets:
+		var st: Dictionary = DB.gear_sets[set_id]
+		if int(st.price) <= 0:
 			continue
-		var owned: bool = Game.state.armor_owned.has(a)
-		var lvl := int(d.get("level", 0))
-		var aa: String = a
-		if owned:
-			var worn: bool = Game.state.armor == a
-			_row([[("✔ Wearing " if worn else "Wear ") + d.name + "  (DEF %d)" % int(d.def), func():
-				Game.state.armor = aa
-				world.player.refresh_from_state()
-				_rebuild(), not worn]])
-		elif int(d.price) > 0:
-			_row([["Buy %s  (DEF %d, %d gil%s)" % [d.name, int(d.def), int(d.price), ", Lv.%d" % lvl if lvl > 1 else ""], func():
-				if Game.spend_gil(int(d.price)):
-					Game.state.armor_owned[aa] = {"tier": 0, "materia": ["", "", ""]}
-					Game.state.armor = aa
+		var lvl := int(st.get("level", 0))
+		var can := Game.job_level() >= lvl
+		_text("%s set  (DEF %d%s)" % [st.name, int(st.def), ", Lv.%d" % lvl if lvl > 1 else ""], 22, UIKit.GOLD if can else UIKit.DIM)
+		var h := HFlowContainer.new()
+		body.add_child(h)
+		var missing := 0
+		for slot in DB.ItemsData.GEAR_SLOTS:
+			var pid: String = "%s_%s" % [set_id, slot]
+			var gd: Dictionary = DB.gear[pid]
+			var owned: bool = Game.state.gear_owned.has(pid)
+			var b: Button
+			if owned:
+				var worn: bool = Game.state.gear[slot] == pid
+				b = UIKit.button(("✔ " if worn else "Wear ") + gd.name, func():
+					Game.equip_gear(pid)
 					world.player.refresh_from_state()
-					_rebuild(), Game.job_level() >= lvl]])
+					_rebuild(), 300)
+				b.disabled = worn
+			else:
+				missing += int(gd.price)
+				b = UIKit.button("Buy %s (%d)" % [gd.name, int(gd.price)], func():
+					if Game.spend_gil(int(gd.price)):
+						Game.equip_gear(pid)
+						world.player.refresh_from_state()
+						_rebuild(), 300)
+				b.disabled = not can
+			h.add_child(b)
+		if missing > 0:
+			var sid: String = set_id
+			var price := missing
+			h.add_child(UIKit.button("Buy whole set (%d)" % price, func():
+				if Game.spend_gil(price):
+					var g := DB.set_gear(sid)
+					for slot in g:
+						Game.equip_gear(g[slot])
+					world.player.refresh_from_state()
+					_rebuild(), 300))
+			(h.get_child(h.get_child_count() - 1) as Button).disabled = not can
 
 func _merchant() -> void:
 	title.text = "Provisioner  —  " + _npc_name()

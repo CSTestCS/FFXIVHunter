@@ -72,7 +72,7 @@ func new_game(slot: int, player_look: Dictionary, hero_look: Dictionary, job: St
 		weapons[j] = {"tier": 0, "materia": ["", ""]}
 	state = {
 		"version": 1, "player": player_look, "hero": hero_look, "hero_job": hero_job, "job": job, "jobs": jobs, "weapons": weapons,
-		"home": city, "gil": 0, "inventory": {}, "armor": "none", "armor_owned": {"none": {"tier": 0, "materia": ["", "", ""]}},
+		"home": city, "gil": 0, "inventory": {}, "gear": {"head": "", "body": "", "hands": "", "legs": "", "feet": ""}, "gear_owned": {},
 		"meal": {}, "temp_buffs": {}, "region": start.region, "pos": [start.pos.x, start.pos.y, start.pos.z],
 		"waystones": [], "last_waystone": "", "flags": {}, "quests": {}, "writ": {}, "writ_board": {}, "writs_done": 0,
 		"party": [], "hired": [], "dropped_gil": {}, "playtime": 0.0, "time": 7.5, "hp_ratio": 0.35,
@@ -121,6 +121,7 @@ func add_gil(n: int, apply_bonus := false) -> void:
 	state.gil = int(state.gil) + n
 	if n > 0:
 		notify.emit("+%d gil" % n)
+		Audio.sfx("gil", null, -6.0)
 	state_changed.emit()
 
 func spend_gil(n: int) -> bool:
@@ -136,6 +137,12 @@ func count(id: String) -> int:
 
 func add_item(id: String, n := 1, silent := false) -> void:
 	if n <= 0:
+		return
+	if DB.gear.has(id):
+		give_gear(id)
+		if not silent:
+			notify.emit("Obtained " + DB.gear[id].name)
+		state_changed.emit()
 		return
 	state.inventory[id] = count(id) + n
 	if not silent:
@@ -172,6 +179,7 @@ func add_xp(n: int) -> void:
 		j.xp = int(j.xp) - xp_to_next(int(j.level))
 		j.level = int(j.level) + 1
 		level_up.emit(state.job, int(j.level))
+		Audio.jingle("level_up")
 		notify.emit("%s reached level %d!" % [DB.jobs[state.job].name, int(j.level)])
 	state_changed.emit()
 
@@ -186,28 +194,39 @@ func buff(key: String) -> float:
 		total += 1.0
 	return total
 
-## Final combat stats for the player (or a companion when `who` is given).
-func compute_stats(job := "", level := -1, armor_id := "", for_player := true) -> Dictionary:
+## Final combat stats. `gear` is a slot -> piece dictionary or a gear set id; "" = the player's gear.
+func compute_stats(job := "", level := -1, gear: Variant = "", for_player := true) -> Dictionary:
 	if job == "":
 		job = state.job
 	if level < 0:
 		level = job_level(job)
-	if armor_id == "":
-		armor_id = state.get("armor", "none")
+	var g: Dictionary
+	if gear is Dictionary:
+		g = gear
+	elif String(gear) == "":
+		g = state.get("gear", {})
+	else:
+		g = DB.set_gear(gear)
 	var jd: Dictionary = DB.jobs[job]
 	var tier := int(state.weapons[job].tier) if for_player else clampi(level / 6, 0, 5)
-	var arm: Dictionary = DB.armor.get(armor_id, DB.armor.none)
-	var arm_tier := int(state.armor_owned.get(armor_id, {}).get("tier", 0)) if for_player else 0
+	var armor_def := 0.0
+	var mats: Array = []
+	if for_player:
+		mats.append_array(state.weapons[job].materia)
+	for slot in g:
+		var pid: String = g[slot]
+		if pid == "" or not DB.gear.has(pid):
+			continue
+		var owned: Dictionary = state.get("gear_owned", {}).get(pid, {}) if for_player else {}
+		armor_def += float(DB.gear[pid].def) * (1.0 + int(owned.get("tier", 0)) * 0.25)
+		mats.append_array(owned.get("materia", []))
 	var s := {
 		"max_hp": (420.0 + level * 46.0) * float(jd.hp),
 		"atk": DB.weapon_attack(job, tier) + level * 2.2,
-		"def": (float(arm.def) * (1.0 + arm_tier * 0.25) + level * 1.2) * float(jd.def),
+		"def": (armor_def + level * 1.2) * float(jd.def),
 		"crit": 0.05, "stamina": 100.0, "speed": 0.0, "max_mp": 100.0 + level * 3.0,
 	}
 	if for_player:
-		var mats: Array = []
-		mats.append_array(state.weapons[job].materia)
-		mats.append_array(state.armor_owned.get(armor_id, {}).get("materia", []))
 		for m in mats:
 			if m != "" and DB.materia.has(m):
 				var md: Dictionary = DB.materia[m]
@@ -221,8 +240,42 @@ func compute_stats(job := "", level := -1, armor_id := "", for_player := true) -
 		s.speed += buff("speed")
 	return s
 
+# ------------------------------------------------------------------ gear
+func give_gear(pid: String) -> void:
+	if not state.gear_owned.has(pid):
+		var n: int = DB.ItemsData.SLOT_INFO[DB.gear[pid].slot].materia
+		var mats := []
+		for i in range(n):
+			mats.append("")
+		state.gear_owned[pid] = {"tier": 0, "materia": mats}
+
+func equip_gear(pid: String) -> void:
+	give_gear(pid)
+	state.gear[DB.gear[pid].slot] = pid
+	state_changed.emit()
+
+func unequip_slot(slot: String) -> void:
+	state.gear[slot] = ""
+	state_changed.emit()
+
+## Upgrades saves from the old single "armor" field.
+func migrate_state(s: Dictionary) -> void:
+	if not s.has("gear"):
+		s.gear = {"head": "", "body": "", "hands": "", "legs": "", "feet": ""}
+		s.gear_owned = {}
+		var old_owned: Dictionary = s.get("armor_owned", {})
+		for set_id in old_owned:
+			for slot in DB.set_gear(set_id):
+				s.gear_owned[DB.set_gear(set_id)[slot]] = {"tier": int(old_owned[set_id].get("tier", 0)), "materia": [""] if slot != "body" else ["", ""]}
+		var worn := DB.set_gear(s.get("armor", ""))
+		for slot in worn:
+			s.gear[slot] = worn[slot]
+		s.erase("armor")
+		s.erase("armor_owned")
+
 func eat_meal(main: String, side: String, drink: String) -> void:
 	state.meal = {"main": main, "side": side, "drink": drink, "time_left": MEAL_DURATION}
+	Audio.sfx("eat")
 	notify.emit("You feel well fed. Meal effects last 30 minutes or until your next mission ends.")
 	state_changed.emit()
 
@@ -268,6 +321,7 @@ func start_quest(id: String, silent := false) -> void:
 		add_item(it, int(q.start_items[it]), true)
 	if not silent:
 		notify.emit("Quest accepted: " + q.name)
+		Audio.jingle("quest_accept")
 	quest_changed.emit()
 	mission_event.emit("accepted", {"quest": id})
 
@@ -315,6 +369,7 @@ func complete_quest(id: String) -> void:
 			start_quest(q.next, true)
 	_end_mission_meal()
 	notify.emit("Quest complete: " + q.name)
+	Audio.jingle("quest_complete")
 	quest_changed.emit()
 	mission_event.emit("quest_complete", {"quest": id})
 
@@ -472,6 +527,7 @@ func accept_writ(city: String, index: int) -> void:
 	state.writ = board[index]
 	board.remove_at(index)
 	notify.emit("Writ accepted: " + state.writ.title)
+	Audio.jingle("quest_accept")
 	quest_changed.emit()
 	mission_event.emit("accepted", {"writ": true})
 
@@ -485,6 +541,7 @@ func complete_writ() -> void:
 	state.writ = {}
 	_end_mission_meal()
 	notify.emit("Writ complete: " + w.title)
+	Audio.jingle("victory")
 	for id in active_quests():
 		if objective(id).kind == "writ":
 			_mark_ready(id)

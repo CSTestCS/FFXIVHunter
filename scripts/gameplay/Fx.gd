@@ -65,6 +65,8 @@ func vfx(kind: String, pos: Vector3, size := 1.0, dir := Vector3.ZERO) -> void:
 	var col: Color = COLORS.get(kind, Color(1, 0.7, 0.3))
 	match kind:
 		"heal", "orb_fall", "splash", "dust":
+			if kind == "heal":
+				Audio.sfx("heal", pos)
 			var r := _inst(ring, col)
 			r.global_position = pos + Vector3.UP * 0.2
 			effects.append({"node": r, "t": 0.0, "dur": 0.7, "grow": size, "base": 0.2})
@@ -115,6 +117,7 @@ func projectile(src: Actor, pos: Vector3, dir: Vector3, p: Dictionary, info: Dic
 
 func aoe(src: Actor, at: Vector3, radius: float, info: Dictionary, targets: Array, kind: String) -> void:
 	vfx(kind, at, radius)
+	Audio.sfx({"lightning": "thunder", "arrows": "bow"}.get(kind, kind) if kind in ["fire", "ice", "lightning", "holy", "dark", "arrows"] else "fire", at, 2.0)
 	for t in targets:
 		var a := t as Actor
 		if a and a.alive and Vector2(a.global_position.x - at.x, a.global_position.z - at.z).length() <= radius + a.radius:
@@ -187,5 +190,6 @@ func _physics_process(delta: float) -> void:
 		if done:
 			if p.kind in ["fire", "holy", "dark", "ice"]:
 				vfx(p.kind, p.pos, 1.2)
+				Audio.sfx(p.kind, p.pos, -6.0)
 			n.queue_free()
 			projectiles.remove_at(i)

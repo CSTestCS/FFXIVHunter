@@ -509,3 +509,31 @@ static func armor_piece(kind: String) -> Mesh:
 				MeshKit.tube(st, Vector3(0, -0.04, 0), Vector3(0, 0.04, 0), 1.0, 1.0, 16, false, Vector2(0.145, 0.11))
 				MeshKit.sheet(st, [Vector3(0.06, 0, -0.1), Vector3(0.09, -0.35, -0.12)], [Vector3(0.12, 0, -0.08), Vector3(0.15, -0.33, -0.1)])
 		return MeshKit.finish(st))
+
+# ------------------------------------------------------------------ placeholder headwear (head space)
+static func headwear(kind: String) -> Mesh:
+	return _cached("head_" + kind, func():
+		var st := MeshKit.begin()
+		match kind:
+			"helm":
+				MeshKit.ellipsoid(st, Vector3(0, 0.02, 0.005), HEAD_R * 1.2, Basis(), 18, 12, func(d: Vector3) -> bool: return d.y > -0.25 and not (d.z < -0.55 and d.y < 0.35 and d.y > -0.25))
+				MeshKit.box(st, Vector3(0, 0.03, -0.112), Vector3(0.02, 0.09, 0.02))
+			"hood":
+				MeshKit.ellipsoid(st, Vector3(0, 0.02, 0.012), HEAD_R * 1.24, Basis(), 18, 12, func(d: Vector3) -> bool: return d.z > -0.45 or d.y > 0.55)
+				MeshKit.cone(st, Vector3(0, 0.06, 0.1), Vector3(0, -0.02, 0.24), 0.07, 8)
+			"hat":
+				MeshKit.tube(st, Vector3(0, 0.07, 0), Vector3(0, 0.08, 0), 0.19, 0.19, 20, true)
+				MeshKit.tube(st, Vector3(0, 0.07, 0), Vector3(0, 0.2, 0.01), 0.1, 0.075, 16, true)
+			"cap":
+				MeshKit.ellipsoid(st, Vector3(0, 0.035, 0.005), HEAD_R * 1.12, Basis(), 16, 10, func(d: Vector3) -> bool: return d.y > 0.25)
+				MeshKit.box(st, Vector3(0, 0.06, -0.11), Vector3(0.12, 0.012, 0.06))
+			"turban":
+				MeshKit.ellipsoid(st, Vector3(0, 0.05, 0.0), Vector3(0.105, 0.09, 0.115), Basis(), 16, 10, func(d: Vector3) -> bool: return d.y > -0.3)
+				MeshKit.tube(st, Vector3(0, 0.0, 0), Vector3(0, 0.05, 0), 1.0, 1.0, 18, false, Vector2(0.105, 0.115))
+			"bandana":
+				MeshKit.ellipsoid(st, Vector3(0, 0.02, 0.005), HEAD_R * 1.08, Basis(), 16, 10, func(d: Vector3) -> bool: return d.y > 0.1)
+				MeshKit.cone(st, Vector3(0, 0.04, 0.1), Vector3(0.02, -0.06, 0.16), 0.03, 6)
+			"circlet":
+				MeshKit.tube(st, Vector3(0, 0.035, 0), Vector3(0, 0.05, 0), 1.0, 1.0, 20, false, Vector2(0.095, 0.105))
+				MeshKit.ellipsoid(st, Vector3(0, 0.045, -0.106), Vector3(0.014, 0.018, 0.008), Basis(), 8, 6)
+		return MeshKit.finish(st))

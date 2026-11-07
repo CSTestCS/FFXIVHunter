@@ -93,6 +93,7 @@ static func button(text: String, cb: Callable, min_w := 0) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.custom_minimum_size = Vector2(min_w, 44)
+	b.pressed.connect(func(): Audio.ui("ui_confirm"))
 	b.pressed.connect(cb)
 	return b
 

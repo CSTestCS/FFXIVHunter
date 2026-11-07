@@ -198,6 +198,39 @@ const QUESTS := {
 		"outro": [["@giver", "Ha! Nets intact. You're a good sort, {first}."]],
 		"rewards": {"gil": 380, "xp": 360, "items": {"potion": 2}},
 	},
+	# ---------------- towns
+	"sq_driftwood": {
+		"name": "Nets of Brinewood", "type": "side", "giver": "driftwood_quest", "level": 6, "requires": ["msq_recovery"],
+		"summary": "Old Mairi's fishing camp in Brinewood keeps getting raided.",
+		"intro": [["@giver", "Bandits come down from the pines every night and take our catch. The camp by the waystone in Brinewood. Hold it for us?"]],
+		"objective": {"kind": "defense", "region": "brinewood", "duration": 80, "text": "Defend the fishing camp"},
+		"outro": [["@giver", "Not a single herring lost! Take this, and stay for supper."]],
+		"rewards": {"gil": 700, "xp": 700, "items": {"hi_potion": 2}},
+	},
+	"sq_whitewatch": {
+		"name": "Winter Bloom", "type": "side", "giver": "whitewatch_quest", "level": 10, "requires": ["msq_recovery"],
+		"summary": "The Whitewatch medic needs frost lilies from the highlands.",
+		"intro": [["@giver", "Frostbite cases every day. Frost lilies make a salve that saves fingers. Five, please, from the Frostspine snowfields."]],
+		"objective": {"kind": "gather", "item": "frost_lily", "count": 5, "region": "", "text": "Gather frost lilies"},
+		"outro": [["@giver", "Bless you. Every finger in Whitewatch thanks you."]],
+		"rewards": {"gil": 900, "xp": 1100, "items": {"frost_furs_hands": 1}},
+	},
+	"sq_mossbridge": {
+		"name": "Ripples on Hollowmere", "type": "side", "giver": "mossbridge_quest", "level": 13, "requires": ["msq_recovery"],
+		"summary": "Something huge glides beneath Hollowmere. The villagers want it gone.",
+		"intro": [["@giver", "The lake used to be so calm. Now a serpent the length of a bridge capsizes our boats. Please. Hunt it."]],
+		"objective": {"kind": "hunt_large", "monster": "hollow_serpent", "region": "hollowmere", "pos": Vector3(-30, 0, 20), "text": "Hunt the Hollowmere Serpent"},
+		"outro": [["@giver", "The lake is still again. Mossbridge won't forget this."]],
+		"rewards": {"gil": 1800, "xp": 2200, "items": {"m_vigor_2": 1}},
+	},
+	"sq_dusthaven": {
+		"name": "The Long Walk", "type": "side", "giver": "dusthaven_quest", "level": 9, "requires": ["msq_recovery"],
+		"summary": "Escort a water-bearer through the Oasis of Lirae.",
+		"intro": [["@giver", "My son carries water to the pilgrims at the far pools. The toads have grown bold. Walk with him?"]],
+		"objective": {"kind": "escort", "region": "oasis_lirae", "text": "Escort the water-bearer"},
+		"outro": [["@giver", "He's home, and the pilgrims have water. You have my thanks."]],
+		"rewards": {"gil": 900, "xp": 950, "items": {"stamina_tonic": 2}},
+	},
 }
 
 ## Writ templates. Region is picked from the city's nearby fields; numbers scale with level.
@@ -219,11 +252,28 @@ const WRITS := [
 	{"kind": "hunt_large", "monster": "tidewyrm", "title": "Deep Trouble", "level": 10, "requires": "msq_tidewyrm"},
 	{"kind": "hunt_large", "monster": "sandmaw", "title": "Dune Diver", "level": 13, "requires": "msq_sandmaw"},
 	{"kind": "hunt_large", "monster": "thornback", "title": "Dragonfire", "level": 16, "requires": "msq_thornback"},
+	{"kind": "hunt_small", "monster": "frost_wolf", "count": 5, "title": "Frostbitten Fangs", "level": 11},
+	{"kind": "hunt_small", "monster": "magma_crab", "count": 4, "title": "Shell Melters", "level": 15},
+	{"kind": "hunt_small", "monster": "crystal_wisp", "count": 4, "title": "Shardlight", "level": 17},
+	{"kind": "hunt_small", "monster": "thorn_beetle", "count": 5, "title": "Beetle Blight", "level": 10},
+	{"kind": "hunt_small", "monster": "sand_toad", "count": 5, "title": "Dry Croak", "level": 11},
+	{"kind": "gather", "item": "frost_lily", "count": 4, "title": "Winter Bloom", "level": 10},
+	{"kind": "gather", "item": "dawn_crystal", "count": 2, "title": "Shard Harvest", "level": 16},
+	{"kind": "hunt_large", "monster": "hollow_serpent", "title": "Still Waters", "level": 14, "requires": "msq_tidewyrm"},
+	{"kind": "hunt_large", "monster": "glacial_colossus", "title": "Thaw the Giant", "level": 19, "requires": "msq_thornback"},
+	{"kind": "hunt_large", "monster": "shardback", "title": "Crystal Crown", "level": 20, "requires": "msq_thornback"},
+	{"kind": "hunt_large", "monster": "magmaw", "title": "Into the Furnace", "level": 21, "requires": "msq_thornback"},
+	{"kind": "hunt_large", "monster": "canyon_drake", "title": "Rust and Ruin", "level": 22, "requires": "msq_thornback"},
 ]
 
 const MONSTER_HOMES := {"grimtusk": ["crossroads"], "mossgiant": ["mirewood"], "tidewyrm": ["saltcrest_shore"], "sandmaw": ["amber_wastes"], "thornback": ["highmoor"],
 	"hopper": ["saltcrest_shore", "crossroads", "highmoor", "verdant_reach", "amber_wastes"], "vale_wolf": ["highmoor", "crossroads", "verdant_reach"],
 	"dune_crawler": ["saltcrest_shore", "amber_wastes"], "bandit": ["saltcrest_shore", "crossroads", "verdant_reach", "amber_wastes"],
-	"marsh_toad": ["mirewood"], "wisp": ["highmoor", "verdant_reach", "mirewood"]}
+	"marsh_toad": ["mirewood", "hollowmere"], "wisp": ["highmoor", "verdant_reach", "mirewood", "glimmerglade"],
+	"frost_wolf": ["frostspine"], "snow_hopper": ["frostspine"], "ice_wisp": ["frostspine"], "magma_crab": ["emberreach", "cindervale"],
+	"ember_wisp": ["emberreach"], "crystal_wisp": ["shattered_expanse"], "shard_crawler": ["shattered_expanse", "cindervale"],
+	"sea_hag": ["wavebreak", "hollowmere"], "thorn_beetle": ["thornveil", "glimmerglade"], "sand_toad": ["scorchmouth", "goldsand", "oasis_lirae"],
+	"hollow_serpent": ["hollowmere"], "glacial_colossus": ["frostspine"], "shardback": ["shattered_expanse"], "magmaw": ["emberreach"], "canyon_drake": ["scorchmouth"]}
 
-const LARGE_POS := {"grimtusk": Vector3(70, 0, -60), "mossgiant": Vector3(60, 0, -40), "tidewyrm": Vector3(20, 0, 150), "sandmaw": Vector3(-20, 0, -90), "thornback": Vector3(-60, 0, -110)}
+const LARGE_POS := {"grimtusk": Vector3(70, 0, -60), "mossgiant": Vector3(60, 0, -40), "tidewyrm": Vector3(20, 0, 150), "sandmaw": Vector3(-20, 0, -90), "thornback": Vector3(-60, 0, -110),
+	"hollow_serpent": Vector3(-30, 0, 20), "glacial_colossus": Vector3(-20, 0, -150), "shardback": Vector3(-80, 0, -60), "magmaw": Vector3(60, 0, -60), "canyon_drake": Vector3(-60, 0, 0)}

@@ -118,7 +118,7 @@ const DEITIES := [
 ## Appearance defaults; every key here is saved and editable.
 static func default_appearance() -> Dictionary:
 	return {
-		"race": "hume", "clan": "lowlander", "body": "feminine",
+		"race": "hume", "clan": "lowlander", "body": "feminine", "model_variant": 0,
 		"height": 0.5, "muscle": 0.3, "bust": 0.5, "weight": 0.3,
 		"face": 0, "eye_shape": 0, "eye_size": 0.5, "eye_color": "#2f5f8f", "eye_color_r": "#2f5f8f", "heterochromia": false,
 		"skin": 1, "hair": "swept", "hair_color": "#5c3b24", "highlights": false, "highlight_color": "#b98a52",

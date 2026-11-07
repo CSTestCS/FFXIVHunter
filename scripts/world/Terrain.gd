@@ -47,8 +47,12 @@ func generate(region: Dictionary) -> void:
 			var z := -half + zi * cell
 			var v := noise.get_noise_2d(x, z)
 			var y := base + v * amp
-			if biome == "highland":
+			if biome in ["highland", "snow"]:
 				y += maxf(0.0, ridge.get_noise_2d(x, z)) * amp * 0.6
+			elif biome in ["canyon", "volcanic"]:
+				# mesas and gorges: terrace the noise and carve ridged gullies
+				var r := ridge.get_noise_2d(x, z)
+				y = base + (round(v * 3.0) / 3.0 * 0.7 + v * 0.3) * amp - maxf(0.0, r) * amp * 0.5
 			elif biome == "desert":
 				y += sin(x * 0.03 + noise.get_noise_2d(z, x) * 3.0) * amp * 0.12
 			h[zi * N + xi] = y

@@ -10,6 +10,8 @@ var hero: CharacterModel
 
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	Audio.play_music("title")
+	Audio.play_ambience("wind")
 	_backdrop()
 	var layer := CanvasLayer.new()
 	add_child(layer)
@@ -29,7 +31,7 @@ func _ready() -> void:
 	ui.add_child(panel)
 	box = UIKit.vbox(10)
 	panel.add_child(box)
-	var ver := UIKit.label("v1.0  ·  Placeholder VRoid models  ·  Custom models: see docs/CUSTOM_MODELS.md", 16, UIKit.DIM)
+	var ver := UIKit.label("v1.1  ·  Placeholder VRoid models (built-in models: docs/MODELS.md)", 16, UIKit.DIM)
 	ver.anchor_top = 1.0
 	ver.anchor_bottom = 1.0
 	ver.offset_top = -40

@@ -34,21 +34,33 @@ godot --path . -- --preview --pose run --view front
 
 ## Building the Windows .exe
 
-Install the Godot 4.3 export templates (Editor > Manage Export Templates), then:
+Install the Godot 4.5.1 export templates (Editor > Manage Export Templates), then:
 
 ```bash
 godot --headless --path . --export-release "Windows Desktop" build/AetherHunter.exe
 ```
 
-The `.pck` is embedded, so the result is a single `AetherHunter.exe`. CI does this on every push
+The `.pck` is embedded, so the result is a single `AetherHunter.exe`, plus
+`AetherHunter.console.exe` (same game with a console window that shows errors, useful for bug
+reports). Logs are also written to `%APPDATA%\AetherHunter\logs\godot.log`.
+
+## Regenerating assets
+
+```bash
+python3 tools/make_placeholder_vrm.py     # placeholder bodies (numpy)
+python3 tools/make_audio.py              # all music/ambience/sfx (numpy, scipy, ffmpeg+libvorbis)
+python3 tools/make_audio.py battle hit_slash   # re-render only some
+``` CI does this on every push
 (`.github/workflows/build.yml`) and uploads it as an artifact.
 
 ## Layout
 
 ```
-scripts/autoload   Settings (input map, graphics), DB (data), Game (rules/state), Saves (slots)
+scripts/autoload   Settings (input, graphics, volumes), DB (data), Game (rules/state), Saves (slots), Audio
+models             built-in VRM bodies / gear / hair (+ generated placeholders) - see docs/MODELS.md
+audio              pre-rendered music, ambience, sound effects
 scripts/data       all content: races, jobs + movesets, items/meals/armor, monsters, regions, NPCs, quests
-scripts/character  VRM loading, retargeted procedural animation, procedural parts (hair, ears, weapons)
+scripts/character  VRM loading (ModelLibrary), gear/hair overlays, retargeted procedural animation, procedural parts (hair, ears, weapons)
 scripts/actors     Actor base, Player, Monster + MonsterBody, Companion, NPC
 scripts/world      World runtime, Terrain, Vegetation, CityBuilder
 scripts/gameplay   Combat math, Fx (telegraphs/projectiles/effects), MissionRunner, Story cutscenes

@@ -39,6 +39,25 @@ func _wait_world() -> Node:
 
 func _run() -> void:
 	var t0 := Time.get_ticks_msec()
+	# world map: every exit needs a way back, every region a waystone
+	for r in DB.regions:
+		for e in DB.regions[r].exits:
+			var back := false
+			for e2 in DB.regions[e.to].exits:
+				back = back or e2.to == r
+			_check(back, "exit %s -> %s has a return exit" % [r, e.to]) if not back else null
+		if DB.regions[r].get("waystones", []).is_empty():
+			_check(false, "region %s has a waystone" % r)
+	for m in DB.QuestsData.MONSTER_HOMES:
+		_check(DB.monsters.has(m), "monster %s exists" % m) if not DB.monsters.has(m) else null
+	print("regions: %d, monsters: %d" % [DB.regions.size(), DB.monsters.size()])
+	for a in ["res://audio/music/title.ogg", "res://audio/music/battle.ogg", "res://audio/amb/forest.ogg", "res://audio/sfx/hit_slash.wav"]:
+		_check(ResourceLoader.exists(a), "audio " + a.get_file())
+	var only := OS.get_cmdline_user_args().find("--only-regions")
+	if only >= 0:
+		await _region_shots(OS.get_cmdline_user_args()[only + 1].split(","))
+		get_tree().quit()
+		return
 	# --- title + creator screens
 	Game.goto_main_menu()
 	await _frames(20)
@@ -95,7 +114,7 @@ func _run() -> void:
 		await get_tree().process_frame
 		if not w.busy and k > 30:
 			break
-	print("city: ", w.region_id, " armor=", Game.state.armor)
+	print("city: ", w.region_id, " gear=", Game.state.gear)
 	await _frames(30)
 	await _shot("06_city")
 	# talk to the guildmaster (turn in awakening), rest at inn, turn in recovery
@@ -233,6 +252,28 @@ func _run() -> void:
 	Saves.delete(7)
 	print("SMOKE TEST %s in %d ms, %d errors" % ["PASSED" if errors == 0 else "FAILED", Time.get_ticks_msec() - t0, errors])
 	get_tree().quit(0 if errors == 0 else 1)
+
+func _region_shots(ids: Array) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	var look := DB.RacesData.randomize_appearance(rng, "hume")
+	look.first_name = "Shot"
+	Game.state = {}
+	Game.new_game(7, look, look.duplicate(), "paladin")
+	Game.pending_cutscene = ""
+	await _wait_world()
+	for r in ids:
+		Game.state.region = r
+		Game.state.pos = [0.0, 0.0, 0.0]
+		Game.state.time = 10.0
+		Game.pending_cutscene = ""
+		Game.goto_world()
+		var w = await _wait_world()
+		w.player.yaw = 0.6
+		w.player.pitch = -0.15
+		await _frames(40)
+		print("music=", Audio.current_music())
+		await _shot("r_" + r)
 
 func _talk(w: Node, npc: String) -> void:
 	if not w.npcs.has(npc):

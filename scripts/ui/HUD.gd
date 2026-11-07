@@ -482,6 +482,7 @@ func _input(event: InputEvent) -> void:
 		return
 	if _dlg_i < _dlg_lines.size() - 1:
 		_dlg_i += 1
+		Audio.ui("ui_page")
 		_show_line()
 	elif _dlg_choices_list.is_empty():
 		dialogue_done.emit(-1)

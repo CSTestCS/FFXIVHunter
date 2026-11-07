@@ -8,6 +8,7 @@ extends RefCounted
 const STYLES := {
 	"port": {"wall": Color("d9d2c4"), "wall2": Color("c8bfae"), "roof": Color("9a3b2a"), "roof2": Color("7d2f22"), "trim": Color("3a3f4a"), "pave": Color("9a958c"), "roof_kind": "gable"},
 	"forest": {"wall": Color("8a6a48"), "wall2": Color("a5845e"), "roof": Color("3f5a2c"), "roof2": Color("5b6b34"), "trim": Color("3a2a1c"), "pave": Color("7d7462"), "roof_kind": "steep"},
+	"snow": {"wall": Color("8a8580"), "wall2": Color("a09a90"), "roof": Color("3a4048"), "roof2": Color("5a3a2a"), "trim": Color("3a2a1c"), "pave": Color("8a8a8e"), "roof_kind": "steep"},
 	"desert": {"wall": Color("dcc29a"), "wall2": Color("e8d6b4"), "roof": Color("c9a24a"), "roof2": Color("2f6f8a"), "trim": Color("6b4a2e"), "pave": Color("c8b48e"), "roof_kind": "flat"},
 }
 
@@ -28,46 +29,59 @@ var streets := []         # [a, b]
 var signs := []           # [pos, text, rot]
 var lamps := []
 var gate_dir := Vector3.FORWARD
+var gate_dirs: Array = []
 var center := Vector3.ZERO
+var town := false
+var radius := 98.0
 
 func prepare(t: Terrain, region: Dictionary) -> void:
 	terrain = t
 	rd = region
 	kind = rd.city
 	style = STYLES[kind]
+	town = rd.type == "town"
+	radius = 60.0 if town else 98.0
 	rng.seed = int(rd.seed) * 7
-	center = Vector3(25, 0, 0) if kind == "port" else Vector3.ZERO
+	center = Vector3(25, 0, 0) if kind == "port" and not town else Vector3.ZERO
 	ground = terrain.height_at(center.x, center.z)
 	ground = maxf(ground, terrain.water + 1.6)
-	terrain.flatten(center, 98.0, ground, 25.0, 0.0, true)
-	var e: Dictionary = rd.exits[0]
-	var gp := terrain.exit_point(e, 0.0)
-	gate_dir = (gp - center)
-	gate_dir.y = 0
-	gate_dir = gate_dir.normalized()
-	# plaza + main street (paved)
-	terrain.flatten(center, 22.0, ground, 3.0, 1.0)
-	terrain.road([center + gate_dir * 20.0, center + gate_dir * 104.0, gp], 7.0, 1.0, true)
-	streets.append([center, center + gate_dir * 110.0])
+	terrain.flatten(center, radius, ground, 25.0, 0.0, true)
+	# plaza + a paved street to every exit (each gets a gate)
+	terrain.flatten(center, 22.0 if not town else 16.0, ground, 3.0, 1.0)
+	for e in rd.exits:
+		var gp := terrain.exit_point(e, 0.0)
+		var d := gp - center
+		d.y = 0
+		d = d.normalized()
+		gate_dirs.append(d)
+		terrain.road([center + d * 18.0, center + d * (radius + 6.0), gp], 7.0 if not town else 5.0, 1.0, true)
+		streets.append([center, center + d * (radius + 12.0)])
+	gate_dir = gate_dirs[0]
 
 func build(parent: Node3D) -> Dictionary:
 	body = StaticBody3D.new()
 	body.name = "CityBody"
 	parent.add_child(body)
 	var ring1 := ["guild", "inn", "canteen", "smith", "materia", "outfitter", "merchant", "recruiter"]
+	if town:
+		ring1 = []
+		for id in DB.npcs:
+			var role: String = DB.npcs[id].role
+			if DB.npcs[id].get("region", "") == rd.id and role not in ["quest", "writ_board", "villager"] and not ring1.has(role):
+				ring1.append(role)
 	var base_ang := atan2(gate_dir.z, gate_dir.x)
 	# key buildings around the plaza, leaving the gate side open
 	for i in range(ring1.size()):
 		var role: String = ring1[i]
 		var a := base_ang + PI + (i - (ring1.size() - 1) / 2.0) * (TAU * 0.78 / ring1.size())
-		var dist := 36.0 if role != "guild" else 40.0
+		var dist := (36.0 if role != "guild" else 40.0) * (0.62 if town else 1.0)
 		var p := center + Vector3(cos(a), 0, sin(a)) * dist
 		var size := Vector3(14, 9, 12) if role == "guild" else Vector3(rng.randf_range(9, 11), rng.randf_range(6, 8), rng.randf_range(8, 10))
 		_building(p, size, center, role)
 		streets.append([center, p])
 		terrain.road([center + (p - center).normalized() * 18.0, p], 5.0, 1.0, true)
-	# job guild halls on an outer ring
-	for i in range(4):
+	# job guild halls on an outer ring (city-states only)
+	for i in range(0 if town else 4):
 		var a := base_ang + PI * 0.5 + i * (PI / 3.0) + (PI / 6.0 if i >= 2 else 0.0)
 		if i >= 2:
 			a = base_ang - PI * 0.5 - (i - 2) * (PI / 3.0)
@@ -80,29 +94,32 @@ func build(parent: Node3D) -> Dictionary:
 	# houses
 	var tries := 0
 	var houses := 0
-	while houses < 55 and tries < 600:
+	while houses < (16 if town else 55) and tries < 600:
 		tries += 1
 		var a := rng.randf() * TAU
-		var r := rng.randf_range(48.0, 92.0)
+		var r := rng.randf_range(32.0, 56.0) if town else rng.randf_range(48.0, 92.0)
 		var p := center + Vector3(cos(a), 0, sin(a)) * r
 		var sz := Vector3(rng.randf_range(6, 9), rng.randf_range(4.5, 7.5), rng.randf_range(6, 9))
 		if not _free(p, sz.length() * 0.55 + 2.0) or terrain.is_water(p.x, p.z, -1.5) or _near_street(p, 6.5):
 			continue
 		_building(p, sz, center, "")
 		houses += 1
-	_walls()
+	if not town:
+		_walls()
 	_plaza()
 	match kind:
-		"port": _docks(parent)
-		"forest": _forest_extras(parent)
+		"port":
+			if not town:
+				_docks(parent)
+		"forest", "snow": _forest_extras(parent)
 		"desert": _desert_extras(parent)
 	_lamps(parent)
 	_finish(parent)
-	var ws := center + gate_dir * 12.0 - gate_dir.cross(Vector3.UP) * 13.0
+	var ws := center + gate_dir * (12.0 if not town else 9.0) - gate_dir.cross(Vector3.UP) * (13.0 if not town else 6.0)
 	return {"spots": spots, "waystone": ws, "center": center}
 
 func _free(p: Vector3, r: float) -> bool:
-	if p.distance_to(center) < 30.0:
+	if p.distance_to(center) < (22.0 if town else 30.0):
 		return false
 	for f in footprints:
 		if Vector2(p.x - f[0].x, p.z - f[0].z).length() < r + float(f[1]):
@@ -205,7 +222,6 @@ func _tri(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, col: Color) -> vo
 func _walls() -> void:
 	var R := 102.0
 	var segs := 28
-	var gate_ang := atan2(gate_dir.z, gate_dir.x)
 	for i in range(segs):
 		var a0 := TAU * i / segs
 		var a1 := TAU * (i + 1) / segs
@@ -213,7 +229,10 @@ func _walls() -> void:
 		var p0 := center + Vector3(cos(a0), 0, sin(a0)) * R
 		var p1 := center + Vector3(cos(a1), 0, sin(a1)) * R
 		var pm := (p0 + p1) * 0.5
-		if absf(wrapf(mid - gate_ang, -PI, PI)) < 0.16:
+		var at_gate := false
+		for gd in gate_dirs:
+			at_gate = at_gate or absf(wrapf(mid - atan2(gd.z, gd.x), -PI, PI)) < 0.16
+		if at_gate:
 			# gate towers
 			for p in [p0, p1]:
 				_tower(p, 9.0)

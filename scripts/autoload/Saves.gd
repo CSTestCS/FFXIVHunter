@@ -57,6 +57,7 @@ func load_into_game(slot: int) -> bool:
 	var s := load_slot(slot)
 	if s.is_empty():
 		return false
+	Game.migrate_state(s)
 	Game.state = s
 	Game.current_slot = slot
 	Game.goto_world()

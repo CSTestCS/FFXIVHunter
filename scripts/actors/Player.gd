@@ -66,6 +66,7 @@ var gather_cb := Callable()
 var forced_pose := ""          # cutscene poses: lying, sit, kneel, wave, cheer, talk
 var cutscene_move := Vector3.ZERO
 var _was_floor := true
+var _step_phase := 0.0
 
 func _init() -> void:
 	faction = "ally"
@@ -131,9 +132,9 @@ func refresh_from_state(full := false) -> void:
 	display_name = Game.player_name()
 	var tier := int(Game.state.weapons[job].tier)
 	if full or model.look != Game.state.player:
-		model.build(Game.state.player, Game.state.armor, weapon, tier)
+		model.build(Game.state.player, Game.state.gear, weapon, tier)
 	else:
-		model.set_outfit(Game.state.armor)
+		model.set_gear(Game.state.gear)
 		model.set_weapon(weapon, tier)
 	model.set_sheathed(in_city)
 
@@ -180,6 +181,7 @@ func _physics_process(delta: float) -> void:
 	var was_swim := swimming
 	swimming = global_position.y < wl - 1.15 or (swimming and global_position.y < wl - 0.85 and not is_on_floor())
 	if swimming and not was_swim:
+		Audio.sfx("splash", global_position)
 		if state in ["attack", "guard"]:
 			state = "free"
 		model.set_sheathed(true)
@@ -269,6 +271,7 @@ func _handle_actions(delta: float) -> void:
 		_queue_attack("art", can_fight)
 	if Input.is_action_just_pressed("jump") and state == "free" and is_on_floor() and not swimming:
 		velocity.y = 7.2
+		Audio.sfx("jump", global_position)
 	if Input.is_action_just_pressed("use_item") and state == "free":
 		_use_item()
 	if Input.is_action_just_pressed("item_next"):
@@ -373,6 +376,7 @@ func _try_dodge() -> void:
 	if not use_stamina(cost):
 		return
 	dodge_kind = jd.dodge
+	Audio.sfx("roll" if dodge_kind != "blink" else "cast", global_position)
 	var d := _input_dir()
 	dodge_dir = d.normalized() if d.length() > 0.2 else -face_dir
 	state = "dodge"
@@ -519,6 +523,8 @@ func _move(delta: float, wl: float) -> void:
 			global_position += d.normalized() * (min_d - d.length()) * 0.5
 	if global_position.y < world.terrain.height_at(global_position.x, global_position.z) - 3.0:
 		global_position.y = world.terrain.height_at(global_position.x, global_position.z) + 0.5
+	if not _was_floor and is_on_floor():
+		Audio.sfx("land", global_position, -6.0)
 	if not _was_floor and is_on_floor() and velocity.y < -14.0:
 		take_hit({"amount": (-velocity.y - 14.0) * 12.0, "type": "blunt"})
 	_was_floor = is_on_floor()
@@ -589,6 +595,7 @@ func _on_dealt(_e: Actor, _dealt: float, info: Dictionary) -> void:
 
 func _on_active() -> void:
 	var flags: Array = move.get("flags", [])
+	_attack_sound(flags)
 	if move_id == "RELOAD":
 		ammo = 6
 		world.hud.toast("Reloaded.")
@@ -635,6 +642,7 @@ func _apply_item() -> void:
 	if not Game.remove_item(id, 1):
 		return
 	var it: Dictionary = DB.items[id]
+	Audio.sfx("potion", global_position)
 	if it.has("heal"):
 		heal_over_time += max_hp * float(it.heal)
 		world.spawn_vfx("heal", global_position + Vector3.UP, 1.2)
@@ -654,6 +662,7 @@ func intercept_hit(dmg: float, info: Dictionary) -> float:
 	if state == "attack" and phase == 1 and "counter" in move.get("flags", []) and from_front:
 		# perfect counter: negate and riposte
 		world.spawn_vfx("parry", center() + face_dir * 0.6, 1.0)
+		Audio.sfx("parry", center())
 		world.hud.toast("Counter!")
 		if src is Actor:
 			var c := _damage(float(move.mv) * 1.2)
@@ -672,6 +681,7 @@ func intercept_hit(dmg: float, info: Dictionary) -> float:
 		var cost := dmg * (0.35 if jd.guard == "shield" else 0.55)
 		if use_stamina(cost):
 			world.spawn_vfx("block", center() + face_dir * 0.5, 0.7)
+			Audio.sfx("block", center())
 			kb_vel = -face_dir * minf(float(info.get("kb", 0.0)), 3.0) * 2.0
 			return dmg * chip
 		# guard broken
@@ -805,7 +815,10 @@ func _animate(delta: float) -> void:
 			pose.merge(Poses.arm("right", 60 + sin(anim_t * 6.0) * 20.0, 10, 15, 30), true)
 		_:
 			if swimming:
+				var before := anim_phase
 				anim_phase += delta * (2.0 + hv)
+				if hv > 0.5 and floor(anim_phase / TAU) != floor(before / TAU):
+					Audio.sfx("swim", global_position, -6.0)
 				pose = Poses.swim(anim_phase, clampf(hv / SWIM, 0.0, 1.0), anim_t)
 				sharp = 6.0
 			elif not is_on_floor() and absf(velocity.y) > 2.0:
@@ -815,7 +828,41 @@ func _animate(delta: float) -> void:
 				var k := clampf(hv / WALK, 0.0, 1.0) if hv < WALK else 1.0 + clampf((hv - WALK) / (RUN - WALK), 0.0, 1.0) + clampf((hv - RUN) / (SPRINT - RUN), 0.0, 1.0)
 				anim_phase += delta * hv * (1.9 if hv < RUN + 0.5 else 1.45)
 				pose = Poses.move(anim_phase, k, anim_t, wk)
+				_footsteps(hv)
 	model.animate(delta, pose, sharp)
+
+func _attack_sound(flags: Array) -> void:
+	var p := global_position + Vector3.UP
+	if move_id == "RELOAD":
+		Audio.sfx("reload", p)
+	elif "proj" in flags:
+		match weapon:
+			"bow": Audio.sfx("bow", p)
+			"gun": Audio.sfx("gun", p)
+			_: Audio.sfx("cast", p)
+	elif "aoe" in flags or "heal" in flags:
+		Audio.sfx("cast_big" if "aoe" in flags else "heal", p)
+	elif weapon in ["fists", "daggers"]:
+		Audio.sfx("whoosh", p)
+	else:
+		Audio.sfx("swing_heavy" if weapon in ["greatsword", "greataxe", "scythe"] or move_id != "L1" and move_id != "L2" else "swing_light", p)
+
+func _footsteps(hv: float) -> void:
+	if not is_on_floor() or hv < 0.5:
+		return
+	if floor(anim_phase / PI) != floor(_step_phase / PI):
+		var kind := "grass"
+		var b: String = world.rd.biome
+		if world.is_city or world.terrain.mask_at(global_position.x, global_position.z) > 0.5:
+			kind = "stone"
+		elif b in ["desert", "canyon", "coast"] and global_position.y < world.terrain.water + 2.0 or b in ["desert", "canyon"]:
+			kind = "sand"
+		elif b == "snow":
+			kind = "snow"
+		elif b in ["volcanic", "crystal", "highland"]:
+			kind = "stone"
+		Audio.sfx("step_" + kind, global_position, -8.0 if hv < RUN else -4.0, 0.15)
+	_step_phase = anim_phase
 
 ## Values saved back into Game.state (position, hp).
 func write_state() -> void:

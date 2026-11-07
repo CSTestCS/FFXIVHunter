@@ -45,6 +45,7 @@ func _ready() -> void:
 	scroll.add_child(body)
 	v.add_child(UIKit.label("◀ LB / PgUp      RB / PgDn ▶      B / Esc: close", 16, UIKit.DIM))
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	Audio.ui("ui_open")
 	_show(maxi(0, TABS.find(start_tab)))
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -59,6 +60,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_show((tab - 1 + TABS.size()) % TABS.size())
 
 func _close() -> void:
+	Audio.ui("ui_cancel")
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	closed.emit()
 	queue_free()
@@ -117,19 +119,31 @@ func _equipment() -> void:
 	_t("Weapon", 26, UIKit.GOLD)
 	_t("%s  (tier %d, ATK %d)" % [DB.weapon_name(s.job, int(w.tier)), int(w.tier), int(DB.weapon_attack(s.job, int(w.tier)))])
 	_t("Materia: " + ", ".join((w.materia as Array).map(func(m): return DB.materia[m].name if m != "" else "(empty)")), 18, UIKit.DIM)
-	_t("Armor", 26, UIKit.GOLD)
-	var a: Dictionary = s.armor_owned.get(s.armor, {"tier": 0, "materia": []})
-	_t("%s +%d  (DEF %d)" % [DB.armor[s.armor].name, int(a.tier), int(DB.armor[s.armor].def)])
-	_t("Materia: " + ", ".join((a.materia as Array).map(func(m): return DB.materia[m].name if m != "" else "(empty)")), 18, UIKit.DIM)
-	_t("Change armor", 22, UIKit.GOLD)
-	var h := HFlowContainer.new()
-	body.add_child(h)
-	for id in s.armor_owned:
-		var aid: String = id
-		h.add_child(UIKit.button(("✔ " if s.armor == id else "") + DB.armor[id].name, func():
-			Game.state.armor = aid
+	_t("Gear", 26, UIKit.GOLD)
+	for slot in DB.ItemsData.GEAR_SLOTS:
+		var cur: String = s.gear.get(slot, "")
+		var row := UIKit.hbox(8)
+		var lbl := UIKit.label("%s:" % DB.ItemsData.SLOT_INFO[slot].name, 20)
+		lbl.custom_minimum_size = Vector2(90, 0)
+		row.add_child(lbl)
+		var sl: String = slot
+		row.add_child(UIKit.button(("✔ " if cur == "" else "") + "(none)", func():
+			Game.unequip_slot(sl)
 			world.player.refresh_from_state()
-			_show(tab), 300))
+			_show(tab), 120))
+		for pid in s.gear_owned:
+			if DB.gear[pid].slot != slot:
+				continue
+			var p2: String = pid
+			var o: Dictionary = s.gear_owned[pid]
+			var b := UIKit.button(("✔ " if cur == pid else "") + "%s +%d (DEF %.1f)" % [DB.gear[pid].name, int(o.tier), float(DB.gear[pid].def)], func():
+				Game.equip_gear(p2)
+				world.player.refresh_from_state()
+				_show(tab), 300)
+			row.add_child(b)
+		body.add_child(row)
+		if cur != "":
+			_t("      Materia: " + ", ".join((s.gear_owned[cur].materia as Array).map(func(m): return DB.materia[m].name if m != "" else "(empty)")), 16, UIKit.DIM)
 	_t("Upgrade weapons and armor at a smithy; meld materia at a materia workshop.", 17, UIKit.DIM)
 
 func _items() -> void:

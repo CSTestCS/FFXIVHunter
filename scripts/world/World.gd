@@ -37,13 +37,15 @@ var _base_fog := 0.0
 var _lost_gil: Node3D
 var _ready_done := false
 var rng := RandomNumberGenerator.new()
+var music_override := ""     # set by cutscenes
+var _music_t := 0.0
 
 func _ready() -> void:
 	Game.world = self
 	region_id = Game.state.region
 	rd = DB.regions[region_id].duplicate(true)
 	rd.id = region_id
-	is_city = rd.type == "city"
+	is_city = rd.type in ["city", "town"]
 	rng.seed = int(rd.seed) + int(Time.get_ticks_msec())
 	hud = HUD.new()
 	add_child(hud)
@@ -150,6 +152,7 @@ func _terrain_material() -> ShaderMaterial:
 		m.set_shader_parameter(k, Color(bio[k]))
 	if is_city:
 		m.set_shader_parameter("pave", CityBuilder.STYLES[rd.city].pave)
+	m.set_shader_parameter("snow", float(bio.get("snow", 0.0)))
 	m.set_shader_parameter("water_level", terrain.water)
 	var n := FastNoiseLite.new()
 	n.frequency = 0.02
@@ -417,6 +420,7 @@ func _gather_node(p: Vector3, item: String, kind: String) -> void:
 		player.start_gather(1.6, func():
 			var n_items := 1 + (1 if randf() < Game.buff("gather") + 0.2 else 0)
 			Game.add_item(item, n_items)
+			Audio.sfx("pickup")
 			remove_interactable(entry)
 			n.queue_free())
 
@@ -593,6 +597,10 @@ func _process(delta: float) -> void:
 	time_s += delta
 	_update_time(delta)
 	_update_camera_fx(delta)
+	_music_t -= delta
+	if _music_t <= 0.0:
+		_music_t = 0.5
+		_update_music()
 	_update_interact()
 	for i in range(_respawns.size() - 1, -1, -1):
 		var r: Array = _respawns[i]
@@ -607,6 +615,45 @@ func _process(delta: float) -> void:
 		open_game_menu()
 	elif not busy and Input.is_action_just_pressed("map") and player.controls:
 		open_game_menu("Map")
+
+## Music follows what's happening: cutscene > boss > battle > city/town > field (biome, day/night).
+func _update_music() -> void:
+	if player == null:
+		return
+	var t: float = Game.state.get("time", 12.0)
+	var night := t < 5.5 or t > 20.0
+	var biome: String = rd.biome
+	var m := ""
+	if music_override != "":
+		m = music_override
+	else:
+		var boss_on := false
+		var fight := false
+		for e in enemies:
+			if e.alive and e.target != null and e.global_position.distance_to(player.global_position) < 45.0:
+				if e.is_large:
+					boss_on = true
+				else:
+					fight = true
+		if boss_on:
+			m = "boss"
+		elif fight:
+			m = "battle"
+		elif is_city:
+			m = rd.get("music", "town")
+		elif biome == "snow":
+			m = "field_snow"
+		elif biome in ["desert", "canyon", "volcanic"]:
+			m = "field_harsh"
+		elif night:
+			m = "field_night"
+		else:
+			m = "field_day"
+	Audio.play_music(m)
+	var amb: String = "city" if is_city else DB.biomes[biome].get("ambience", "wind")
+	if night and amb in ["meadow", "forest", "city"]:
+		amb = "night"
+	Audio.play_ambience(amb)
 
 func _update_camera_fx(delta: float) -> void:
 	if player == null:
@@ -676,6 +723,8 @@ func on_actor_damaged(a: Actor, dmg: float, info: Dictionary) -> void:
 	fx.number(a.center() + Vector3.UP * a.height * 0.4, int(dmg), col)
 	if not (a is Player):
 		fx.vfx("crit" if info.get("crit", false) else "hit", a.center(), 0.5 if not info.get("crit", false) else 0.9)
+	var hit_id: String = {"slash": "hit_slash", "blunt": "hit_blunt", "pierce": "hit_pierce", "magic": "hit_magic"}.get(info.get("type", "slash"), "hit_slash")
+	Audio.sfx("crit" if info.get("crit", false) else hit_id, a.center(), 0.0 if not (a is Player) else 2.0)
 	if a is Player:
 		shake(minf(0.35, dmg / a.max_hp * 2.0))
 		hud.refresh_bars()
@@ -704,6 +753,7 @@ func on_player_faint() -> void:
 	busy = true
 	player.controls = false
 	hud.toast("You have fainted...")
+	Audio.jingle("faint")
 	await get_tree().create_timer(2.0).timeout
 	await hud.fade(1.0, 0.8)
 	var failed: bool = mission.on_player_faint()
@@ -864,6 +914,7 @@ func _waystone_menu(id: String) -> void:
 
 func _attune(id: String, silent := false) -> void:
 	Game.state.waystones.append(id)
+	Audio.sfx("waystone", waystones[id].global_position)
 	Game.state.last_waystone = id
 	if not silent:
 		fx.vfx("heal", waystones[id].global_position + Vector3.UP, 4.0)
@@ -912,7 +963,7 @@ func fast_travel(ws_id: String) -> void:
 				Game.state.region = r
 				var p: Vector3 = ws.pos
 				Game.state.pos = [p.x + 3.0, 0.0, p.z + 3.0]
-				if DB.regions[r].type == "city":
+				if DB.regions[r].type in ["city", "town"]:
 					Game.state.pos = [0.0, 0.0, 0.0]
 				Game.state.last_waystone = ws_id
 				Saves.save(Game.current_slot, Game.state)

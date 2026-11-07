@@ -119,8 +119,10 @@ class Builder:
                 b0 = a0 + seg; b1 = a1 + seg
                 self.idx += [a0, b0, a1, a1, b0, b1]
 
-def build(fem):
+def build(fem, overlay=None):
     J, s = skeleton(fem)
+    if overlay:
+        return build_overlay(fem, overlay)
     names = list(J.keys())
     bi = {n: i for i, n in enumerate(names)}
     P = lambda n: J[n][1]
@@ -174,6 +176,25 @@ def build(fem):
     return J, names, pos, nrm, np.array(B.joints, np.uint16), np.array(B.weights, np.float32), np.array(B.region, np.float32), \
         np.array(B.idx, np.uint32), {k: np.array(v, np.float32) for k, v in B.morph.items()}
 
+def build_overlay(fem, kind):
+    """Test overlays: a skinned long-sleeve shirt, or rigid hair (exercise the game's overlay path)."""
+    J, s = skeleton(fem)
+    names = list(J.keys()); bi = {n: i for i, n in enumerate(names)}; P = lambda n: J[n][1]
+    B = Builder(); m = 1.0 if fem else 1.12; g = 1.45
+    if kind == "shirt":
+        B.add_ring_tube(P("J_Bip_C_Hips") + [0, 0.02, 0], P("J_Bip_C_Chest"), 0.125 * m * g, 0.12 * m * g, bi["J_Bip_C_Spine"], parent=bi["J_Bip_C_Hips"], child=bi["J_Bip_C_Chest"], region=R_TORSO, sq=(1, 0.75), caps=False)
+        B.add_ring_tube(P("J_Bip_C_Chest"), P("J_Bip_C_Neck"), 0.135 * m * g * (1 if fem else 1.12), 0.07, bi["J_Bip_C_UpperChest"], parent=bi["J_Bip_C_Chest"], region=R_TORSO, sq=(1, 0.8), caps=False)
+        for side in ("L", "R"):
+            ua, la, hd = (f"J_Bip_{side}_{k}" for k in ("UpperArm", "LowerArm", "Hand"))
+            B.add_ring_tube(P(ua), P(la), 0.075 * m, 0.06 * m, bi[ua], child=bi[la], region=R_UARM, caps=False)
+            B.add_ring_tube(P(la), P(hd) * 0.98 + P(la) * 0.02, 0.06 * m, 0.05 * m, bi[la], parent=bi[ua], region=R_LARM, caps=False)
+    else:
+        hc = P("J_Bip_C_Head") + np.array([0, 0.11, 0.02]) * s
+        B.add_ellipsoid(hc, np.array([0.1, 0.1, 0.11]) * s, bi["J_Bip_C_Head"], R_HEAD)
+        B.add_ring_tube(hc + [0, -0.02, 0.08], hc + [0, -0.3, 0.12], 0.05, 0.01, bi["J_Bip_C_Head"], region=R_HEAD)
+    return J, names, np.array(B.pos, np.float32), np.array(B.nrm, np.float32), np.array(B.joints, np.uint16), np.array(B.weights, np.float32), \
+        np.array(B.region, np.float32), np.array(B.idx, np.uint32), {k: np.array(v, np.float32) for k, v in B.morph.items()}
+
 HUMAN_MAP = {"J_Bip_C_Hips": "hips", "J_Bip_C_Spine": "spine", "J_Bip_C_Chest": "chest", "J_Bip_C_UpperChest": "upperChest",
              "J_Bip_C_Neck": "neck", "J_Bip_C_Head": "head"}
 for side, w in (("L", "left"), ("R", "right")):
@@ -181,8 +202,8 @@ for side, w in (("L", "left"), ("R", "right")):
                  ("UpperLeg", "UpperLeg"), ("LowerLeg", "LowerLeg"), ("Foot", "Foot"), ("ToeBase", "Toes")):
         HUMAN_MAP[f"J_Bip_{side}_{k}"] = w + v
 
-def write_glb(path, fem):
-    J, names, pos, nrm, joints, weights, region, idx, morph = build(fem)
+def write_glb(path, fem, overlay=None, mat_name="PH_Body_SKIN", color=(0.9, 0.75, 0.65, 1)):
+    J, names, pos, nrm, joints, weights, region, idx, morph = build(fem, overlay)
     blob = bytearray(); views = []; accs = []
     def add(arr, target=None, comp=5126, typ="VEC3", minmax=False, normalized=False):
         while len(blob) % 4: blob.append(0)
@@ -241,7 +262,7 @@ def write_glb(path, fem):
         "meshes": [{"name": "Body", "primitives": [{"attributes": {"POSITION": a_pos, "NORMAL": a_nrm, "TEXCOORD_0": a_uv0,
                     "TEXCOORD_1": a_uv1, "COLOR_0": a_col, "JOINTS_0": a_j, "WEIGHTS_0": a_w}, "indices": a_idx, "material": 0, "targets": targets}],
                     "weights": [0, 0, 0], "extras": {"targetNames": ["Bust", "Muscle", "Weight"]}}],
-        "materials": [{"name": "PH_Body_SKIN", "pbrMetallicRoughness": {"baseColorFactor": [0.9, 0.75, 0.65, 1], "metallicFactor": 0, "roughnessFactor": 0.6}}],
+        "materials": [{"name": mat_name, "pbrMetallicRoughness": {"baseColorFactor": list(color), "metallicFactor": 0, "roughnessFactor": 0.6}}],
         "skins": [{"joints": skin_joints, "inverseBindMatrices": a_ibm, "skeleton": ni["Root"]}],
         "accessors": accs, "bufferViews": views, "buffers": [{"byteLength": len(blob)}],
     }
@@ -257,6 +278,12 @@ def write_glb(path, fem):
     print(path, len(pos), "verts", len(idx) // 3, "tris")
 
 if __name__ == "__main__":
+    import sys
+    if len(sys.argv) > 2 and sys.argv[1] == "--test-overlays":
+        d = sys.argv[2]; os.makedirs(d + "/gear", exist_ok=True); os.makedirs(d + "/hair", exist_ok=True)
+        write_glb(d + "/gear/leather_set_body.vrm", True, "shirt", "Shirt_CLOTH", (0.15, 0.35, 0.7, 1))
+        write_glb(d + "/hair/testhair.vrm", True, "hair", "Hair_HAIR", (1, 1, 1, 1))
+        sys.exit(0)
     os.makedirs(OUT, exist_ok=True)
     write_glb(os.path.join(OUT, "body_feminine.vrm"), True)
     write_glb(os.path.join(OUT, "body_masculine.vrm"), False)

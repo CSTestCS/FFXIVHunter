@@ -27,6 +27,8 @@ var _dragging := false
 
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	Audio.play_music("town")
+	Audio.play_ambience("")
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	looks.player = RacesData.randomize_appearance(rng, "hume")
@@ -167,11 +169,19 @@ func _build_options() -> void:
 				a.ears = 0
 				a.tail = 0
 				a.horns = 0
-				a.skin = mini(int(a.skin), 3), true)
+				a.skin = mini(int(a.skin), 3)
+				a.model_variant = 0, true)
 			var clan_ids: Array = r.clans.keys()
-			_stepper("Clan", clan_ids.map(func(x): return r.clans[x].name), clan_ids.find(a.clan), func(i): a.clan = clan_ids[i])
+			_stepper("Clan", clan_ids.map(func(x): return r.clans[x].name), clan_ids.find(a.clan), func(i):
+				a.clan = clan_ids[i]
+				a.model_variant = 0)
 			_note(r.desc + "\n" + r.clans[a.clan].desc)
-			_stepper("Body type", ["Feminine", "Masculine"], 0 if a.body == "feminine" else 1, func(i): a.body = ["feminine", "masculine"][i])
+			_stepper("Body type", ["Feminine", "Masculine"], 0 if a.body == "feminine" else 1, func(i):
+				a.body = ["feminine", "masculine"][i]
+				a.model_variant = 0)
+			var variants := ModelLibrary.body_variants(a.race, a.clan, a.body)
+			if variants.size() > 1:
+				_stepper("Body model", variants.map(func(p): return (p as String).get_file().get_basename().capitalize()), int(a.get("model_variant", 0)), func(i): a.model_variant = i)
 			var tones: Array = r.clans[a.clan].skin
 			_swatches("Skin tone", tones, int(a.skin), func(i): a.skin = i)
 			_stepper("Voice", RacesData.VOICES, int(a.voice), func(i): a.voice = i)
@@ -193,8 +203,10 @@ func _build_options() -> void:
 			if a.heterochromia:
 				_colors("Right eye colour", RacesData.EYE_COLORS, "eye_color_r")
 		"Hair":
-			var styles: Array = RacesData.HAIRSTYLES
-			_stepper("Hairstyle", styles.map(func(h): return h.name), styles.map(func(h): return h.id).find(a.hair), func(i): a.hair = styles[i].id)
+			var styles: Array = RacesData.HAIRSTYLES.duplicate()
+			for extra in ModelLibrary.extra_hairstyles(styles.map(func(h): return h.id)):
+				styles.append({"id": extra, "name": (extra as String).capitalize()})
+			_stepper("Hairstyle", styles.map(func(h): return h.name), maxi(0, styles.map(func(h): return h.id).find(a.hair)), func(i): a.hair = styles[i].id)
 			_colors("Hair colour", RacesData.HAIR_COLORS, "hair_color")
 			_stepper("Highlights", ["Off", "On"], 1 if a.highlights else 0, func(i): a.highlights = i == 1)
 			if a.highlights:

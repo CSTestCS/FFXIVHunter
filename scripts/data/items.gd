@@ -10,6 +10,7 @@ const ITEMS := {
 	"phoenix_down": {"name": "Phoenix Plume", "type": "consumable", "price": 600, "desc": "Automatically revives you once when you would faint.", "auto_revive": true},
 	# gathered materials
 	"wild_herb": {"name": "Wild Herb", "type": "material", "price": 8, "desc": "A common medicinal herb."},
+	"frost_lily": {"name": "Frost Lily", "type": "material", "price": 45, "desc": "A pale flower that blooms in snow."},
 	"sunleaf": {"name": "Sunleaf", "type": "material", "price": 20, "desc": "A golden leaf that drinks in sunlight."},
 	"iron_ore": {"name": "Iron Ore", "type": "material", "price": 15, "desc": "Rough iron ore."},
 	"mythril_ore": {"name": "Mythril Ore", "type": "material", "price": 60, "desc": "Light, silvery ore prized by smiths."},
@@ -51,30 +52,55 @@ const MATERIA := {
 	"m_haste_1": {"name": "Haste Materia I", "stat": "speed", "value": 0.04, "price": 500},
 }
 
-## Armor sets. colors map body regions (see placeholder_body.gdshader) to RGB.
-## "parts" adds rigid armor pieces. Custom clothing models replace these visuals by id.
-const ARMOR := {
-	"none": {"name": "Smallclothes", "def": 0, "price": 0, "hidden": true,
-		"colors": {"torso": "", "uarm": "", "larm": "", "hand": "", "pelvis": "#d9d2c3", "thigh": "", "shin": "", "foot": "", "bust": "#d9d2c3"}},
-	"simple_tunic": {"name": "Hand-me-down Tunic", "def": 3, "price": 0,
+## Gear sets. Each set becomes five equippable pieces (head, body, hands, legs, feet) - see
+## DB.gear. A piece looks for its model at models/gear/<piece_id>.vrm (see docs/MODELS.md);
+## without one, the placeholder body is painted with the set colours and simple parts.
+## colors map body regions (see placeholder_body.gdshader) to RGB. head = placeholder headwear.
+const GEAR_SETS := {
+	"simple_tunic": {"name": "Hand-me-down", "def": 3, "price": 0, "head": "",
+		"pieces": {"head": "Cap", "body": "Tunic", "hands": "Wraps", "legs": "Trousers", "feet": "Shoes"},
 		"colors": {"torso": "#8a7a5c", "uarm": "#8a7a5c", "larm": "", "hand": "", "pelvis": "#5b4b36", "thigh": "#5b4b36", "shin": "#5b4b36", "foot": "#3b2c20", "bust": "#8a7a5c"}, "rough": 0.9},
-	"leather_set": {"name": "Hunter's Leathers", "def": 10, "price": 900, "level": 1,
+	"leather_set": {"name": "Hunter's", "def": 10, "price": 900, "level": 1, "head": "cap",
+		"pieces": {"head": "Cap", "body": "Jerkin", "hands": "Gloves", "legs": "Breeches", "feet": "Boots"},
 		"colors": {"torso": "#6b4a2e", "uarm": "#6b4a2e", "larm": "#4a3220", "hand": "#3a2618", "pelvis": "#4a3220", "thigh": "#5a4630", "shin": "#3a2618", "foot": "#2e1f14", "bust": "#6b4a2e"}, "rough": 0.7, "parts": ["belt", "bracers"]},
-	"chain_set": {"name": "Riveted Chainmail", "def": 18, "price": 2600, "level": 8,
+	"chain_set": {"name": "Riveted", "def": 18, "price": 2600, "level": 8, "head": "helm",
+		"pieces": {"head": "Coif", "body": "Hauberk", "hands": "Gauntlets", "legs": "Chausses", "feet": "Sabatons"},
 		"colors": {"torso": "#8d9196", "uarm": "#8d9196", "larm": "#5c5f63", "hand": "#3a3022", "pelvis": "#4b3a2a", "thigh": "#8d9196", "shin": "#4b3a2a", "foot": "#2e2a26", "bust": "#8d9196"}, "rough": 0.45, "metal": 0.7, "parts": ["belt", "pauldrons_light"]},
-	"plate_set": {"name": "Knightly Plate", "def": 30, "price": 7200, "level": 16,
+	"plate_set": {"name": "Knightly", "def": 30, "price": 7200, "level": 16, "head": "helm",
+		"pieces": {"head": "Helm", "body": "Cuirass", "hands": "Gauntlets", "legs": "Cuisses", "feet": "Greaves"},
 		"colors": {"torso": "#b7bcc4", "uarm": "#b7bcc4", "larm": "#b7bcc4", "hand": "#9aa0a8", "pelvis": "#b7bcc4", "thigh": "#9aa0a8", "shin": "#b7bcc4", "foot": "#9aa0a8", "bust": "#b7bcc4"}, "rough": 0.3, "metal": 0.95, "parts": ["pauldrons_heavy", "belt"]},
-	"scholar_robes": {"name": "Scholar's Robes", "def": 12, "price": 1600, "level": 4,
+	"scholar_robes": {"name": "Scholar's", "def": 12, "price": 1600, "level": 4, "head": "hat",
+		"pieces": {"head": "Hat", "body": "Robe", "hands": "Gloves", "legs": "Skirt", "feet": "Shoes"},
 		"colors": {"torso": "#2c3e6b", "uarm": "#2c3e6b", "larm": "#2c3e6b", "hand": "", "pelvis": "#2c3e6b", "thigh": "#2c3e6b", "shin": "#24324f", "foot": "#2a2218", "bust": "#2c3e6b"}, "rough": 0.85, "parts": ["mantle", "belt"]},
-	"ranger_garb": {"name": "Wayfarer's Garb", "def": 14, "price": 1900, "level": 6,
+	"ranger_garb": {"name": "Wayfarer's", "def": 14, "price": 1900, "level": 6, "head": "hood",
+		"pieces": {"head": "Hood", "body": "Tabard", "hands": "Bracers", "legs": "Trousers", "feet": "Boots"},
 		"colors": {"torso": "#3d5a3a", "uarm": "#3d5a3a", "larm": "#5a4630", "hand": "#3a2618", "pelvis": "#5a4630", "thigh": "#4a5a3a", "shin": "#3a2618", "foot": "#2e1f14", "bust": "#3d5a3a"}, "rough": 0.8, "parts": ["hood_cape", "belt", "bracers"]},
-	"desert_silks": {"name": "Sunmarch Silks", "def": 13, "price": 1800, "level": 6,
+	"desert_silks": {"name": "Sunmarch", "def": 13, "price": 1800, "level": 6, "head": "turban",
+		"pieces": {"head": "Turban", "body": "Vest", "hands": "Armlets", "legs": "Sirwal", "feet": "Sandals"},
 		"colors": {"torso": "#c9a24a", "uarm": "#e8dcc0", "larm": "#e8dcc0", "hand": "", "pelvis": "#8c2f2f", "thigh": "#e8dcc0", "shin": "#e8dcc0", "foot": "#6b4a2e", "bust": "#c9a24a"}, "rough": 0.6, "parts": ["sash"]},
-	"sea_coat": {"name": "Corsair's Coat", "def": 16, "price": 2200, "level": 8,
+	"sea_coat": {"name": "Corsair's", "def": 16, "price": 2200, "level": 8, "head": "bandana",
+		"pieces": {"head": "Bandana", "body": "Coat", "hands": "Gloves", "legs": "Breeches", "feet": "Boots"},
 		"colors": {"torso": "#7a1f24", "uarm": "#7a1f24", "larm": "#7a1f24", "hand": "#2a2218", "pelvis": "#2a2a34", "thigh": "#2a2a34", "shin": "#1e1a16", "foot": "#1e1a16", "bust": "#e8e0d0"}, "rough": 0.65, "parts": ["belt", "coat_tails"]},
-	"dawnward_regalia": {"name": "Dawnward Regalia", "def": 45, "price": 25000, "level": 24,
+	"frost_furs": {"name": "Frostwarden", "def": 20, "price": 3200, "level": 10, "head": "hood",
+		"pieces": {"head": "Fur Hood", "body": "Fur Coat", "hands": "Mittens", "legs": "Leggings", "feet": "Snowboots"},
+		"colors": {"torso": "#e8e2d6", "uarm": "#cfc6b4", "larm": "#cfc6b4", "hand": "#6b4a2e", "pelvis": "#5a4a3a", "thigh": "#5a4a3a", "shin": "#e8e2d6", "foot": "#4a3a2a", "bust": "#e8e2d6"}, "rough": 0.95, "parts": ["mantle", "belt"]},
+	"dawnward_regalia": {"name": "Dawnward", "def": 45, "price": 25000, "level": 24, "head": "circlet",
+		"pieces": {"head": "Circlet", "body": "Regalia", "hands": "Gauntlets", "legs": "Tassets", "feet": "Greaves"},
 		"colors": {"torso": "#f0ead8", "uarm": "#3a4a7a", "larm": "#f0ead8", "hand": "#c9a24a", "pelvis": "#3a4a7a", "thigh": "#f0ead8", "shin": "#c9a24a", "foot": "#3a2e22", "bust": "#f0ead8"}, "rough": 0.4, "metal": 0.4, "parts": ["pauldrons_light", "mantle", "belt"]},
 }
+
+const GEAR_SLOTS := ["head", "body", "hands", "legs", "feet"]
+## Which placeholder body regions each slot paints, its share of the set's defense/price,
+## and its materia slots.
+const SLOT_INFO := {
+	"head": {"name": "Head", "regions": [], "share": 0.15, "materia": 1},
+	"body": {"name": "Body", "regions": ["torso", "uarm", "larm", "bust"], "share": 0.4, "materia": 2},
+	"hands": {"name": "Hands", "regions": ["hand"], "share": 0.1, "materia": 1},
+	"legs": {"name": "Legs", "regions": ["pelvis", "thigh", "shin"], "share": 0.25, "materia": 1},
+	"feet": {"name": "Feet", "regions": ["foot"], "share": 0.1, "materia": 1},
+}
+## What you wear with nothing equipped (smallclothes).
+const UNDERWEAR := {"pelvis": "#d9d2c3", "bust": "#d9d2c3"}
 
 ## Meals: three slots, each slot targets a different side of a hunt.
 ##   main  -> offense & health   side -> defense & stamina   drink -> utility (speed, swim, rewards)

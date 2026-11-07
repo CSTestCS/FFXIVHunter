@@ -55,6 +55,15 @@ static func tree_meshes(kind: String) -> Array:
 			for k in range(5):
 				var a := TAU * k / 5.0
 				MeshKit.ellipsoid(leaves, Vector3(cos(a) * 1.4, 4.4, sin(a) * 1.4), Vector3(1.8, 0.8, 1.8), Basis(), 9, 5, Callable(), g1 if k % 2 == 0 else g2, 0.2)
+		"crystal":
+			for k in range(5):
+				var a := TAU * k / 5.0 + 0.3
+				var lean := Vector3(cos(a) * 0.35, 1.0, sin(a) * 0.35).normalized() if k > 0 else Vector3.UP
+				var h := 3.2 if k == 0 else 1.6 + 0.3 * k
+				var base := Vector3(cos(a), 0, sin(a)) * (0.0 if k == 0 else 0.6)
+				MeshKit.tube(leaves, base - Vector3.UP * 0.3, base + lean * h * 0.7, 0.35 if k == 0 else 0.22, 0.3 if k == 0 else 0.18, 6, false, Vector2.ONE, g1)
+				MeshKit.cone(leaves, base + lean * h * 0.7, base + lean * h, 0.3 if k == 0 else 0.18, 6, Vector2.ONE, g2)
+			MeshKit.tube(trunk, Vector3(0, 0, 0), Vector3(0, 0.05, 0), 0.01, 0.01, 3, false)
 		"cactus":
 			MeshKit.tube(leaves, Vector3.ZERO, Vector3(0, 3.0, 0), 0.3, 0.28, 10, true, Vector2.ONE, g1)
 			MeshKit.chain(leaves, [Vector3(0, 1.4, 0), Vector3(0.7, 1.5, 0), Vector3(0.75, 2.3, 0)], [0.18, 0.18, 0.16], 8, Vector2.ONE, g2)
@@ -107,16 +116,17 @@ static func populate(parent: Node3D, terrain: Terrain, rd: Dictionary, avoid: Ar
 	var bark_mat := MeshKit.vcol_pbr(0.9)
 	var leaf_mat := ShaderMaterial.new()
 	leaf_mat.shader = FoliageShader
-	leaf_mat.set_shader_parameter("leaf", Color(bio.grass).darkened(0.15))
+	leaf_mat.set_shader_parameter("leaf", Color(bio.get("leaf", Color(bio.grass).darkened(0.15).to_html())))
+	var crystal_mat := MeshKit.pbr(Color("8a70d8"), 0.08, 0.1, Color("a080ff"), 1.2)
 	var body := StaticBody3D.new()
 	body.name = "VegetationBody"
 	parent.add_child(body)
 	# trees
-	var kinds: Array = bio.trees
+	var kinds: Array = rd.get("trees", bio.trees)
 	var per_kind := {}
 	for k in kinds:
 		per_kind[k] = []
-	var step := 11.0 / sqrt(maxf(float(bio.tree_density) * q, 0.05))
+	var step := 11.0 / sqrt(maxf(float(bio.tree_density) * float(rd.get("tree_mult", 1.0)) * q, 0.05))
 	var x := -terrain.half + 20.0
 	while x < terrain.half - 20.0:
 		var z := -terrain.half + 20.0
@@ -140,7 +150,7 @@ static func populate(parent: Node3D, terrain: Terrain, rd: Dictionary, avoid: Ar
 		var meshes := tree_meshes(kind)
 		for group in _chunked(list, 128.0):
 			_multimesh(parent, meshes[0], bark_mat, group, 300.0, true)
-			_multimesh(parent, meshes[1], leaf_mat, group, 300.0, true)
+			_multimesh(parent, meshes[1], crystal_mat if kind == "crystal" else leaf_mat, group, 300.0, true)
 		for xf in list:
 			var cs := CollisionShape3D.new()
 			var cyl := CylinderShape3D.new()

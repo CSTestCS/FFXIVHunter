@@ -84,3 +84,28 @@ const MONSTERS := {
 			{"anim": "projectile", "tele": "circle", "at": "target", "radius": 4.0, "windup": 1.6, "active": 0.3, "recover": 1.2, "dmg": 1.5, "kb": 4.0, "range": [7, 30], "cd": 6.0},
 			{"anim": "roar", "tele": "donut", "at": "self", "radius": 14.0, "inner": 5.0, "windup": 1.8, "active": 0.5, "recover": 1.5, "dmg": 1.6, "kb": 5.0, "range": [0, 14], "cd": 15.0, "rage_only": true}]},
 }
+
+## Regional variants: copy a base monster and override fields (merged by DB at startup).
+const VARIANTS := {
+	"frost_wolf": {"base": "vale_wolf", "name": "Frostfang Wolf", "level": 12, "hp": 760, "atk": 44, "def": 10, "colors": ["#dfe6ee", "#7a8ea8"], "xp": 120, "gil": 40, "drops": [["wolf_fang", 0.8], ["beast_hide", 0.7], ["frost_lily", 0.2]]},
+	"snow_hopper": {"base": "hopper", "name": "Snowdrift Hopper", "level": 10, "hp": 520, "atk": 30, "colors": ["#f2f4f8", "#c8d0dc"], "xp": 80, "gil": 25},
+	"ice_wisp": {"base": "wisp", "name": "Rime Wisp", "level": 13, "hp": 820, "atk": 50, "colors": ["#bfe8ff", "#ffffff"], "xp": 140, "gil": 45},
+	"magma_crab": {"base": "dune_crawler", "name": "Magma Crawler", "level": 16, "hp": 1250, "atk": 56, "def": 26, "colors": ["#2a2220", "#ff7a2a"], "xp": 200, "gil": 60, "drops": [["crab_shell", 0.8], ["adamant_ore", 0.15]]},
+	"ember_wisp": {"base": "wisp", "name": "Ember Wisp", "level": 17, "hp": 1100, "atk": 60, "colors": ["#ff8a3a", "#ffe0a0"], "xp": 220, "gil": 60},
+	"crystal_wisp": {"base": "wisp", "name": "Shard Wisp", "level": 18, "hp": 1200, "atk": 62, "colors": ["#b88aff", "#ffffff"], "xp": 240, "gil": 70, "drops": [["wisp_ember", 0.8], ["dawn_crystal", 0.12]]},
+	"shard_crawler": {"base": "dune_crawler", "name": "Shard Crawler", "level": 17, "hp": 1300, "atk": 58, "def": 30, "colors": ["#5a4a7a", "#c8b0ff"], "xp": 230, "gil": 65, "drops": [["crab_shell", 0.6], ["dawn_crystal", 0.08]]},
+	"sea_hag": {"base": "marsh_toad", "name": "Reef Toad", "level": 9, "hp": 640, "atk": 36, "colors": ["#2f6a7a", "#d8c890"], "xp": 90, "gil": 30},
+	"thorn_beetle": {"base": "dune_crawler", "name": "Thornback Beetle", "level": 11, "hp": 720, "atk": 40, "def": 18, "colors": ["#3a5a2a", "#a8c050"], "xp": 110, "gil": 35, "drops": [["crab_shell", 0.6], ["ash_log", 0.3]]},
+	"sand_toad": {"base": "marsh_toad", "name": "Dune Toad", "level": 12, "hp": 760, "atk": 44, "colors": ["#b89a62", "#e8d8a8"], "xp": 120, "gil": 40},
+	# large
+	"glacial_colossus": {"base": "mossgiant", "name": "Glacial Colossus", "title": "Heart of the Frostspine", "level": 20, "hp": 16000, "atk": 92, "def": 34, "colors": ["#c8d8ec", "#7aa8d8"], "xp": 3600, "gil": 2400,
+		"drops": [["golem_core", 1.0], ["mythril_ore", 1.0], ["dawn_crystal", 0.5]]},
+	"magmaw": {"base": "sandmaw", "name": "Magmaw", "title": "The Molten Throat", "level": 22, "hp": 18500, "atk": 98, "def": 30, "colors": ["#3a2a24", "#ff6a1a"], "xp": 4200, "gil": 2800,
+		"drops": [["sandmaw_fang", 1.0], ["adamant_ore", 1.0], ["drake_heart", 0.2]]},
+	"shardback": {"base": "grimtusk", "name": "Shardback", "title": "Crystal-Crowned Tyrant", "level": 21, "hp": 17000, "atk": 94, "def": 36, "colors": ["#4a3a6a", "#d0b8ff"], "xp": 3900, "gil": 2600, "scale": 3.0,
+		"drops": [["grimtusk_tusk", 1.0], ["dawn_crystal", 1.0], ["dawn_crystal", 0.5]], "weak": {"slash": 0.8, "blunt": 1.3, "pierce": 0.9, "magic": 1.1}},
+	"hollow_serpent": {"base": "tidewyrm", "name": "Hollowmere Serpent", "title": "Queen of the Still Lake", "level": 15, "hp": 11500, "atk": 76, "def": 20, "colors": ["#2a4a3a", "#9ad8a8"], "xp": 2500, "gil": 1700,
+		"drops": [["tidewyrm_fin", 1.0], ["pearl", 1.0], ["pearl", 0.6]]},
+	"canyon_drake": {"base": "thornback", "name": "Rustwing Drake", "title": "Terror of Scorchmouth", "level": 23, "hp": 20000, "atk": 102, "def": 30, "colors": ["#8a3a1a", "#e8c070"], "xp": 4600, "gil": 3100,
+		"drops": [["drake_scale", 1.0], ["drake_scale", 1.0], ["drake_heart", 0.35]]},
+}

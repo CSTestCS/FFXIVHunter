@@ -7,6 +7,8 @@ static var _cam: Camera3D
 
 static func play(w: Node, id: String) -> void:
 	w.hud.letterbox(true)
+	w.music_override = "title" if id in ["opening", "opening_city", "recovered"] else "hero"
+	Audio.play_music(w.music_override, 1.0)
 	var keep_alive := w
 	match id:
 		"opening": await _opening(w)
@@ -20,6 +22,7 @@ static func play(w: Node, id: String) -> void:
 		"finale_circle": await _finale(w)
 	if not is_instance_valid(keep_alive):
 		return
+	w.music_override = ""
 	w.hud.letterbox(false)
 	if _cam and is_instance_valid(_cam):
 		_cam.queue_free()
@@ -88,6 +91,7 @@ static func p_front(w: Node, dist: float, side := 0.0) -> Vector3:
 static func vanish(w: Node, c: Node3D, kind := "blink") -> void:
 	if not is_instance_valid(c) or not is_instance_valid(w):
 		return
+	Audio.sfx("holy" if kind == "light" else ("ice" if kind == "ice" else "whoosh"), c.global_position)
 	w.spawn_vfx(kind, c.global_position + Vector3.UP, 2.0)
 	c.queue_free()
 
@@ -132,8 +136,8 @@ static func _opening(w: Node) -> void:
 static func _opening_city(w: Node) -> void:
 	var p: Player = w.player
 	w.hud.fade_instant(1.0)
-	Game.state.armor = "simple_tunic"
-	Game.state.armor_owned["simple_tunic"] = {"tier": 0, "materia": ["", "", ""]}
+	for slot in ["body", "legs", "feet"]:
+		Game.equip_gear("simple_tunic_" + slot)
 	p.refresh_from_state()
 	p.model.set_bruised(0.6)
 	var rid: String = Game.resolve("@rescuer")

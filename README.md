@@ -2,10 +2,11 @@
 
 A 3D action RPG that blends **MMO-style character creation, jobs, cities and guild work** with
 **Monster Hunter-style hunts and weapon movesets** and a few **Elden Ring-style** systems,
-built in Godot 4.3 with VRoid (VRM) characters.
+built in Godot 4.5 with VRoid (VRM) characters.
 
 > **Play now:** download `build/AetherHunter.zip`, extract it, and run `AetherHunter.exe`
-> (Windows 10/11, x86-64, Vulkan-capable GPU). The CI workflow also builds the `.exe` on every
+> (Windows 10/11, x86-64; Vulkan, with automatic Direct3D 12 / OpenGL fallback).
+> `AetherHunter.console.exe` is the same game with a console window that shows any errors. The CI workflow also builds the `.exe` on every
 > push (Actions → *Build & test* → artifact `AetherHunter-windows`).
 
 ## What's in the game
@@ -45,14 +46,24 @@ Thornback Drake. **Swimming and diving** with a breath meter.
 the wild drops some gil where you fell (recover it before you faint again), Phoenix Plume
 auto-revive, weapon arts.
 
+**Gear** · Clothing and armor are worn per slot (head, body, hands, legs, feet), bought piece by
+piece or as sets, reinforced at smithies, with materia slots on every piece.
+
+**Audio** · Original soundtrack (title, three city themes, town, field day/night, snow and harsh
+lands, battle, boss, hero theme, jingles), biome ambience and ~50 sound effects; volume sliders
+for master, music, ambience, effects and interface.
+
 **Progression** · Gil, per-job levels (cap 50), weapon upgrades (6 tiers per job), armor sets
 and reinforcement, materia melding (2 weapon + 3 armor slots), learning new jobs at each city's
 job guilds, and hiring a party of up to 3 AI companions.
 
-**World** · 3 walled cities (Saltcrest, Verdhollow, Sunmarch) and 6 field regions connected by
-roads at their edges into one walkable world, with day/night, lakes and sea, forests, desert.
+**World** · 25 regions in one walkable world: 3 walled city-states (Saltcrest, Verdhollow,
+Sunmarch), 4 towns (Driftwood Landing, Whitewatch, Mossbridge, Dusthaven) and 18 field zones
+clustered around the cities: coasts, sea cliffs, a volcano, highlands, frozen peaks, a crystal
+wasteland, old forest, deep forest, a great lake, fens, a glowing glade, dunes, canyons, salt
+flats, mines and an oasis. Day/night, swimming in seas and lakes, 26 monster types (10 large).
 
-**Saves** · 8 save slots, autosave on travel and rest.
+**Saves** · 8 save slots, autosave on travel and rest (older saves are upgraded automatically).
 
 **Controls** · Full keyboard/mouse and gamepad support for gameplay and all menus.
 See *Settings* in game for the full list.
@@ -64,14 +75,17 @@ Monster Hunter and Elden Ring mechanics, but it does not recreate their worlds, 
 maps. The structure mirrors what was asked (three city-states, a guild, legendary heroes who have
 "disbanded", a hero you design yourself) using original content.
 
-## Your own VRoid models
+## VRoid models
 
-See **[docs/CUSTOM_MODELS.md](docs/CUSTOM_MODELS.md)**. Put `.vrm` files in a `CustomModels`
-folder next to the `.exe`; they replace the placeholders without rebuilding the game.
+See **[docs/MODELS.md](docs/MODELS.md)**. Naked base bodies (several per subrace and body type),
+gear pieces and hairstyles are separate `.vrm` files under `models/`; gear and hair are re-bound to
+the body's skeleton at runtime. They're built into the game, and the placeholders are used only
+where a file is missing.
 
 ## Performance design
 
-* Regions are generated from data at load time (the whole game package is ~2 MB).
+* Regions are generated from data at load time (game data is a few MB, mostly audio).
+* Audio is pre-rendered (no runtime synthesis); 3D sounds come from a small reusable pool.
 * Static geometry is merged into a few meshes; trees, rocks and grass use chunked MultiMeshes
   with visibility ranges; far monsters sleep and far NPCs animate at a reduced rate.
 * Hit detection is analytic (no physics queries per swing); effects share one material.

@@ -10,6 +10,7 @@ uniform vec3 sand : source_color = vec3(0.85, 0.79, 0.6);
 uniform vec3 dirt : source_color = vec3(0.53, 0.44, 0.31);
 uniform vec3 pave : source_color = vec3(0.62, 0.6, 0.56);
 uniform float water_level = -1000.0;
+uniform float snow = 0.0;
 uniform sampler2D detail : filter_linear_mipmap, repeat_enable;
 uniform sampler2D detail_n : hint_normal, filter_linear_mipmap, repeat_enable;
 
@@ -56,6 +57,10 @@ void fragment() {
 	vec3 pcol = pave * (0.88 + 0.12 * n1) * mix(0.7, 1.0, cb);
 	col = mix(col, pcol, pv);
 	rough = mix(rough, mix(0.95, 0.7, cb), pv);
+	// snow settles on flat ground (not on roads or paving)
+	float sn = snow * smoothstep(0.32, 0.12, slope + (n2 - 0.5) * 0.2) * (1.0 - road) * (1.0 - pv);
+	col = mix(col, vec3(0.92, 0.94, 0.98) * (0.94 + 0.08 * n2), sn);
+	rough = mix(rough, 0.6, sn);
 	col *= mix(1.0, 0.55, wet);
 	rough = mix(rough, 0.25, wet * 0.8);
 	ALBEDO = col;

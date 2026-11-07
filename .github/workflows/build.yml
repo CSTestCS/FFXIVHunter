@@ -8,19 +8,19 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      GODOT: "4.3-stable"
+      GODOT: "4.5.1-stable"
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Godot ${{ env.GODOT }} and export templates
         run: |
-          mkdir -p ~/godot ~/.local/share/godot/export_templates/4.3.stable
+          mkdir -p ~/godot ~/.local/share/godot/export_templates/4.5.1.stable
           cd ~/godot
           curl -sSLo godot.zip https://github.com/godotengine/godot/releases/download/${GODOT}/Godot_v${GODOT}_linux.x86_64.zip
           unzip -q godot.zip
           mv Godot_v${GODOT}_linux.x86_64 godot
           curl -sSLo templates.tpz https://github.com/godotengine/godot/releases/download/${GODOT}/Godot_v${GODOT}_export_templates.tpz
-          unzip -q -j templates.tpz "templates/windows_release_x86_64.exe" "templates/windows_debug_x86_64.exe" "templates/version.txt" -d ~/.local/share/godot/export_templates/4.3.stable
+          unzip -q -j templates.tpz "templates/windows_release_x86_64.exe" "templates/windows_release_x86_64_console.exe" "templates/windows_debug_x86_64.exe" "templates/version.txt" -d ~/.local/share/godot/export_templates/4.5.1.stable
           rm templates.tpz
 
       - name: No unused scripts
@@ -41,4 +41,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: AetherHunter-windows
-          path: build/AetherHunter.exe
+          path: |
+            build/AetherHunter.exe
+            build/AetherHunter.console.exe
