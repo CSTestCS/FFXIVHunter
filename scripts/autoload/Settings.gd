@@ -8,6 +8,7 @@ signal changed
 
 var data := {
 	"quality": 2,            # 0 low, 1 medium, 2 high, 3 ultra
+	"renderer": "auto",      # auto, vulkan, d3d12, opengl (applied by RendererGuard at boot)
 	"render_scale": 1.0,     # 3D resolution scale (FSR upscaling below 1.0)
 	"fullscreen": false,
 	"vsync": true,
@@ -109,9 +110,9 @@ func _make_event(spec: String) -> InputEvent:
 
 func load_settings() -> void:
 	var cfg := ConfigFile.new()
-	if cfg.load(PATH) == OK:
-		for k in data.keys():
-			data[k] = cfg.get_value("settings", k, data[k])
+	if cfg.load(PATH) == OK and cfg.has_section("settings"):
+		for k in cfg.get_section_keys("settings"):
+			data[k] = cfg.get_value("settings", k)
 
 func save_settings() -> void:
 	var cfg := ConfigFile.new()
@@ -130,8 +131,9 @@ func apply_window() -> void:
 	vp.scaling_3d_scale = float(data.render_scale)
 	vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR if float(data.render_scale) < 0.99 else Viewport.SCALING_3D_MODE_BILINEAR
 	var q := int(data.quality)
-	vp.msaa_3d = Viewport.MSAA_DISABLED if q < 2 else Viewport.MSAA_2X
-	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if q < 2 else Viewport.SCREEN_SPACE_AA_DISABLED
+	# MSAA only on Ultra: it is the most common source of driver glitches; FXAA elsewhere.
+	vp.msaa_3d = Viewport.MSAA_2X if q >= 3 else Viewport.MSAA_DISABLED
+	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED if q >= 3 else Viewport.SCREEN_SPACE_AA_FXAA
 	RenderingServer.directional_shadow_atlas_set_size([2048, 2048, 4096, 4096][q], true)
 	RenderingServer.directional_soft_shadow_filter_set_quality([RenderingServer.SHADOW_QUALITY_HARD, RenderingServer.SHADOW_QUALITY_SOFT_LOW, RenderingServer.SHADOW_QUALITY_SOFT_MEDIUM, RenderingServer.SHADOW_QUALITY_SOFT_HIGH][q])
 	RenderingServer.sub_surface_scattering_set_quality([RenderingServer.SUB_SURFACE_SCATTERING_QUALITY_DISABLED, RenderingServer.SUB_SURFACE_SCATTERING_QUALITY_LOW, RenderingServer.SUB_SURFACE_SCATTERING_QUALITY_MEDIUM, RenderingServer.SUB_SURFACE_SCATTERING_QUALITY_HIGH][q])

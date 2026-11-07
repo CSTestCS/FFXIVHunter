@@ -27,6 +27,12 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
+	# make sure 3D rendering works on this GPU (switches to OpenGL + relaunches if not)
+	if RendererGuard.ensure(self):
+		return
+	if not await RendererGuard.self_test(self):
+		if RendererGuard.fall_back(self):
+			return
 	Game.goto_main_menu()
 	# keep the splash up until the title has drawn a few frames
 	for i in range(4):

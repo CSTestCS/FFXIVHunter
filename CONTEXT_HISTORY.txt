@@ -155,3 +155,31 @@ TESTING
 * --check: all scripts compile on 4.5.1. --smoke-test passes (25 regions load, map exits are
   two-way, audio resources load, menus, quests, save/load, migration path).
 * Region screenshots of the new biomes reviewed. Exported .exe run under Wine (software Vulkan).
+
+--------------------------------------------------------------------------------
+SESSION 3 - 2026-11-07
+--------------------------------------------------------------------------------
+
+USER REQUEST
+------------
+Screenshot of the title screen: the menu renders, but the whole 3D view behind it is noise
+("There is an issue").
+
+DIAGNOSIS
+---------
+2D (UI) renders but the 3D viewport shows uninitialised video memory: the graphics driver fails
+in the Forward+ (Vulkan / D3D12) 3D path on the user's PC. Not reproducible here (software
+Vulkan and Wine both render correctly), so the fix makes the game detect and route around it.
+
+WHAT CHANGED
+------------
+* scripts/RendererGuard.gd: at first launch per driver, renders a hidden 64x64 test scene with
+  the same effects as the game (shadows, SSAO, glow, fog, ACES, MSAA) and reads it back; noisy
+  or wrong output => switch to the OpenGL (Compatibility) renderer and relaunch automatically.
+  The title screen then explains the switch.
+* Settings > Graphics > Renderer: Automatic / Vulkan / Direct3D 12 / OpenGL (relaunches).
+* MSAA only on Ultra (common driver-glitch source); FXAA on the other presets.
+* build/AetherHunter_SafeMode.bat: starts in OpenGL mode.
+* Settings now load every saved key (needed for the renderer flags).
+* Verified: OpenGL renderer draws title, cities and fields correctly; exported .exe under Wine
+  passes the self-test on Vulkan and relaunches into OpenGL when the setting asks for it.

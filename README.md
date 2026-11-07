@@ -68,6 +68,16 @@ flats, mines and an oasis. Day/night, swimming in seas and lakes, 26 monster typ
 **Controls** · Full keyboard/mouse and gamepad support for gameplay and all menus.
 See *Settings* in game for the full list.
 
+## Troubleshooting graphics
+
+* On first launch the game tests 3D rendering on your GPU. If your driver produces garbled output,
+  it switches to the OpenGL (compatibility) renderer and restarts by itself.
+* You can pick the renderer in **Settings > Graphics > Renderer** (Automatic, Vulkan, Direct3D 12,
+  OpenGL). The game restarts to apply it.
+* `AetherHunter_SafeMode.bat` always starts in OpenGL mode.
+* For a bug report, run `AetherHunter.console.exe` and copy the text it prints, or send
+  `%APPDATA%\AetherHunter\logs\godot.log`.
+
 ## Setting
 
 The world, names, characters and story are **original**: the game is inspired by FFXIV,

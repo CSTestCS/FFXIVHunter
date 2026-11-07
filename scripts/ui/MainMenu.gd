@@ -37,6 +37,13 @@ func _ready() -> void:
 	ver.offset_top = -40
 	ver.offset_left = 20
 	ui.add_child(ver)
+	if Settings.data.get("renderer_fallback", false):
+		Settings.data.renderer_fallback = false
+		Settings.save_settings()
+		var note := UIKit.label("Your graphics driver had trouble with the default renderer, so the game switched to OpenGL (compatibility) mode.\nYou can change this in Settings > Graphics > Renderer.", 18, UIKit.GOLD, true)
+		note.position = Vector2(110, 600)
+		note.custom_minimum_size = Vector2(900, 0)
+		ui.add_child(note)
 	_main()
 
 func _backdrop() -> void:

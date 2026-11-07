@@ -11,6 +11,16 @@ func _build() -> void:
 	var d: Dictionary = Settings.data
 	add_child(UIKit.label("Graphics", 26, UIKit.GOLD))
 	_option("Quality preset", Settings.QUALITY_NAMES, int(d.quality), func(i): _apply("quality", i))
+	var rends := ["auto", "vulkan", "d3d12", "opengl"]
+	_option("Renderer (restarts the game)", ["Automatic", "Vulkan", "Direct3D 12", "OpenGL (compatibility / safe)"], rends.find(String(d.get("renderer", "auto"))), func(i):
+		_apply("renderer", rends[i])
+		for k in Settings.data.keys():
+			if String(k).begins_with("gpu_ok_"):
+				Settings.data.erase(k)
+		Settings.save_settings()
+		if not OS.has_feature("editor"):
+			OS.create_process(OS.get_executable_path(), [])
+			get_tree().quit())
 	add_child(UIKit.label("    Low: no SSAO/grass, short shadows.  Medium: SSAO + grass.  High: SSR + longer shadows.  Ultra: SDFGI, SSIL, volumetric fog.", 16, UIKit.DIM, true))
 	_slider("3D resolution scale (FSR below 100%)", 0.5, 1.0, 0.05, float(d.render_scale), func(v): _apply("render_scale", v))
 	_check("Fullscreen", bool(d.fullscreen), func(v): _apply("fullscreen", v))

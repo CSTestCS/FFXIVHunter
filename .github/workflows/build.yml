@@ -44,3 +44,4 @@ jobs:
           path: |
             build/AetherHunter.exe
             build/AetherHunter.console.exe
+            build/AetherHunter_SafeMode.bat
