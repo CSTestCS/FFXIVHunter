@@ -50,13 +50,13 @@ func _ready() -> void:
 	layer = 10
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	root = Control.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.theme = UIKit.theme()
 	add_child(root)
 	uw_rect = ColorRect.new()
 	uw_rect.color = Color(0.1, 0.35, 0.5, 0.28)
-	uw_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	uw_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	uw_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	uw_rect.visible = false
 	root.add_child(uw_rect)
@@ -68,7 +68,7 @@ func _ready() -> void:
 	letter_bot = _bar_rect(false)
 	fade_rect = ColorRect.new()
 	fade_rect.color = Color(0, 0, 0, 0)
-	fade_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	fade_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(fade_rect)
 	_build_loading()
@@ -190,7 +190,7 @@ func _build_center() -> void:
 	root.add_child(prompt)
 	reticle = Reticle.new()
 	reticle.hud = self
-	reticle.set_anchors_preset(Control.PRESET_FULL_RECT)
+	reticle.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	reticle.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(reticle)
 	banner_box = UIKit.vbox(0)
@@ -246,10 +246,10 @@ func _bar_rect(top: bool) -> ColorRect:
 func _build_loading() -> void:
 	loading = ColorRect.new()
 	(loading as ColorRect).color = Color("080b12")
-	loading.set_anchors_preset(Control.PRESET_FULL_RECT)
+	loading.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.add_child(loading)
 	var v := UIKit.vbox(10)
-	v.set_anchors_preset(Control.PRESET_CENTER)
+	v.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	v.offset_left = -400
 	v.offset_right = 400
 	v.offset_top = -60

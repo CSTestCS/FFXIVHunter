@@ -16,14 +16,14 @@ var scroll: ScrollContainer
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	theme = UIKit.theme()
 	var dim := ColorRect.new()
 	dim.color = Color(0.02, 0.03, 0.06, 0.78)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(dim)
 	var p := UIKit.panel(24)
-	p.set_anchors_preset(Control.PRESET_FULL_RECT)
+	p.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	p.offset_left = 120
 	p.offset_right = -120
 	p.offset_top = 70
@@ -90,7 +90,8 @@ func _show(i: int) -> void:
 
 func _t(text: String, size := 20, col := UIKit.TEXT) -> Label:
 	var l := UIKit.label(text, size, col, true)
-	l.custom_minimum_size = Vector2(1500, 0)
+	l.custom_minimum_size = Vector2(400, 0)
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(l)
 	return l
 
@@ -234,7 +235,7 @@ func _map() -> void:
 	h.add_child(tr)
 	var mk := MapMarks.new()
 	mk.world = world
-	mk.set_anchors_preset(Control.PRESET_FULL_RECT)
+	mk.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	tr.add_child(mk)
 	var v := UIKit.vbox(6)
 	h.add_child(v)

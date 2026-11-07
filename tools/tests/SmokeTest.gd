@@ -53,6 +53,10 @@ func _run() -> void:
 	print("regions: %d, monsters: %d" % [DB.regions.size(), DB.monsters.size()])
 	for a in ["res://audio/music/title.ogg", "res://audio/music/battle.ogg", "res://audio/amb/forest.ogg", "res://audio/sfx/hit_slash.wav"]:
 		_check(ResourceLoader.exists(a), "audio " + a.get_file())
+	if "--ui-shots" in OS.get_cmdline_user_args():
+		await _ui_shots()
+		get_tree().quit()
+		return
 	var only := OS.get_cmdline_user_args().find("--only-regions")
 	if only >= 0:
 		await _region_shots(OS.get_cmdline_user_args()[only + 1].split(","))
@@ -252,6 +256,94 @@ func _run() -> void:
 	Saves.delete(7)
 	print("SMOKE TEST %s in %d ms, %d errors" % ["PASSED" if errors == 0 else "FAILED", Time.get_ticks_msec() - t0, errors])
 	get_tree().quit(0 if errors == 0 else 1)
+
+## Screenshots of every screen and menu (layout checks at the current window size).
+func _ui_shots() -> void:
+	Game.goto_main_menu()
+	await _frames(15)
+	await _shot("ui_title")
+	var mm = Game.screen
+	mm._settings()
+	await _frames(5)
+	await _shot("ui_title_settings")
+	mm._load_game()
+	await _frames(5)
+	await _shot("ui_title_load")
+	Game.goto_creator(7)
+	await _frames(10)
+	var cc = Game.screen
+	for c in range(cc.CATS.size()):
+		cc.cat = c
+		cc._build_options()
+		await _frames(4)
+		await _shot("ui_creator_%d" % c)
+	cc.editing = "hero"
+	cc.cat = 6
+	cc._build_options()
+	await _frames(4)
+	await _shot("ui_creator_hero")
+	cc.editing = "player"
+	cc.step = "job"
+	cc.job = "paladin"
+	cc._refresh_model()
+	cc._build_options()
+	await _frames(6)
+	await _shot("ui_jobs")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4
+	var look := DB.RacesData.randomize_appearance(rng, "hume")
+	look.first_name = "Ui"
+	look.last_name = "Test"
+	Game.new_game(7, look, look.duplicate(), "paladin")
+	var w = await _wait_world()
+	for k in range(140):
+		await get_tree().process_frame
+		if k == 110:
+			await _shot("ui_opening_lying")
+		if w.hud._dlg_open and k < 100:
+			pass
+	await _shot("ui_dialogue")
+	Game.state.region = "saltcrest"
+	Game.state.pos = [0.0, 0.0, 0.0]
+	Game.pending_cutscene = ""
+	Game.set_flag("writs_unlocked")
+	Game.set_flag("party_unlocked")
+	Game.add_gil(50000)
+	for it in ["iron_ore", "beast_hide", "m_might_1", "potion", "hi_potion"]:
+		Game.add_item(it, 5, true)
+	Game.goto_world()
+	w = await _wait_world()
+	await _frames(20)
+	await _shot("ui_hud")
+	w.hud.say([["Rhosyn Hale", "This is a long line of dialogue to check wrapping and layout of the dialogue box at small window sizes, with choices below."]], ["Accept: A quest with a fairly long name", "Not now"])
+	await _frames(90)
+	await _shot("ui_dialogue_choices")
+	w.hud.dialogue_done.emit(1)
+	await _frames(3)
+	for kind in ["inn", "canteen", "smith", "materia", "outfitter", "merchant", "recruiter", "job_master", "guild", "writ_board", "waystone"]:
+		var npc := ""
+		for id in DB.npcs:
+			if DB.npcs[id].get("region", "") == "saltcrest" and DB.npcs[id].role == kind:
+				npc = id
+		var menu := ServiceMenu.new()
+		menu.world = w
+		menu.kind = kind
+		menu.npc_id = npc if kind != "waystone" else "ws_saltcrest"
+		w.hud.add_child(menu)
+		await _frames(4)
+		await _shot("ui_svc_" + kind)
+		menu._close()
+		await _frames(2)
+	var gm := GameMenu.new()
+	gm.world = w
+	w.hud.add_child(gm)
+	await _frames(3)
+	for i in range(GameMenu.TABS.size()):
+		gm._show(i)
+		await _frames(4)
+		await _shot("ui_menu_%s" % GameMenu.TABS[i])
+	gm._close()
+	get_tree().paused = false
 
 func _region_shots(ids: Array) -> void:
 	var rng := RandomNumberGenerator.new()

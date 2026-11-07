@@ -765,6 +765,12 @@ func _update_camera(delta: float) -> void:
 
 func _animate(delta: float) -> void:
 	var hv := Vector2(velocity.x, velocity.z).length()
+	# slope under a lying body (head lies "behind" the feet)
+	if forced_pose == "lying" or state in ["dead", "knockdown"]:
+		var back := -face_dir * model.height_m * 0.9
+		var hf: float = world.terrain.height_at(global_position.x, global_position.z)
+		var hh: float = world.terrain.height_at(global_position.x + back.x, global_position.z + back.z)
+		model.ground_pitch = atan2(hh - hf, model.height_m * 0.9)
 	var wk := "" if (model.sheathed) else weapon
 	var pose: Dictionary
 	var sharp := 14.0

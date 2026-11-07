@@ -183,3 +183,25 @@ WHAT CHANGED
 * Settings now load every saved key (needed for the renderer flags).
 * Verified: OpenGL renderer draws title, cities and fields correctly; exported .exe under Wine
   passes the self-test on Vulkan and relaunches into OpenGL when the setting asks for it.
+
+--------------------------------------------------------------------------------
+SESSION 4 - 2026-11-07
+--------------------------------------------------------------------------------
+
+USER REQUEST (verbatim)
+-----------------------
+Many UI elements don't stay within the bounds of the screen, making many of them unusable. Also, in the opening cutscene, the player character clips into the ground. Finally I observed that many materials such as the placeholder characters' bodies and a tree I saw had inverted normals
+
+WHAT CHANGED
+------------
+* UI: menus created at runtime set their anchors after entering the tree, which in Godot 4 keeps
+  the old (zero) size; the pause menu collapsed and shop menus landed off the top-left. All
+  anchor presets now use set_anchors_and_offsets_preset; shop menus fill the screen with margins
+  and scroll; title-screen Settings scrolls; fixed-width text blocks became flexible.
+  Checked with a new UI screenshot mode (--ui-shots) at 1125x609 and 1024x768: title, settings,
+  load, every creator tab, job select, HUD, dialogue, all 11 service menus, all 9 pause tabs.
+* Normals: a numeric mesh check (tools/tests/KitTest.gd, --kit) found MeshKit tube sides inverted
+  (tree trunks, cones/pine canopies, limbs of parts, weapons) and the placeholder VRM bodies
+  inside-out (triangles written in the wrong order for glTF). Both fixed; all meshes pass.
+* Lying pose (opening cutscene, knockdown, fainting): lifted by body depth and tilted to follow
+  the slope of the ground under the body, so it no longer sinks in.

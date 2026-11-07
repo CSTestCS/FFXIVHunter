@@ -91,7 +91,7 @@ func _ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	var root := Control.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.theme = UIKit.theme()
 	root.mouse_filter = Control.MOUSE_FILTER_PASS
 	layer.add_child(root)

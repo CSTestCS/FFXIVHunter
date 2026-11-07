@@ -38,6 +38,8 @@ var _tail: Node3D
 var _eyes: Array[Node3D] = []
 var _t := 0.0
 var _extras := {"_lie": 0.0, "_roll": 0.0, "_pitch": 0.0, "_spin": 0.0}
+## Slope (radians, + = head end higher) of the ground under a lying body; set by the owner.
+var ground_pitch := 0.0
 var _blink := 3.0
 var _vis_scale := 1.0
 
@@ -559,7 +561,11 @@ func animate(delta: float, pose: Dictionary, sharpness := 12.0) -> void:
 	var h := height_m * 0.55
 	var xf := Transform3D()
 	if _extras._lie > 0.001:
-		xf = Transform3D(Basis(Vector3.RIGHT, deg_to_rad(90.0 * _extras._lie)), Vector3(0, 0.12 * _extras._lie, 0))
+		# lie on the back: pivot at the feet, lift by the body's depth so back/heels/hair stay above
+		# ground, and tilt to follow the slope under the body
+		var lift := 0.2 * (height_m / 1.65)
+		var tilt: float = -ground_pitch * _extras._lie
+		xf = Transform3D(Basis(Vector3.RIGHT, deg_to_rad(90.0 * _extras._lie) + tilt), Vector3(0, lift * _extras._lie, 0))
 	if _extras._roll > 0.001 and _extras._roll < 0.999:
 		var r := Basis(Vector3.RIGHT, -TAU * _extras._roll)
 		xf = Transform3D(Basis(), Vector3(0, h * 0.6, 0)) * Transform3D(r, Vector3.ZERO) * Transform3D(Basis(), Vector3(0, -h * 0.6, 0))

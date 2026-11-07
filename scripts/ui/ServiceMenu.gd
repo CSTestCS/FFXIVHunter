@@ -16,30 +16,33 @@ var _sel := {"main": "", "side": "", "drink": ""}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	theme = UIKit.theme()
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.45)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(dim)
 	panel = UIKit.panel(22)
-	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.custom_minimum_size = Vector2(980, 640)
-	panel.position = Vector2(-490, -320)
 	add_child(panel)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	panel.offset_left = 240
+	panel.offset_right = -240
+	panel.offset_top = 70
+	panel.offset_bottom = -70
 	var v := UIKit.vbox(10)
 	panel.add_child(v)
 	title = UIKit.label("", 34, UIKit.GOLD)
 	v.add_child(title)
 	var sc := ScrollContainer.new()
-	sc.custom_minimum_size = Vector2(940, 470)
+	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	v.add_child(sc)
 	body = UIKit.vbox(6)
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sc.add_child(body)
 	info = UIKit.label("", 19, UIKit.DIM, true)
-	info.custom_minimum_size = Vector2(940, 0)
+	info.custom_minimum_size = Vector2(400, 0)
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_child(info)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Audio.ui("ui_open")

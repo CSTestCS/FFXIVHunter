@@ -16,7 +16,7 @@ func _ready() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	ui = Control.new()
-	ui.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ui.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	ui.theme = UIKit.theme()
 	layer.add_child(ui)
 	var title := UIKit.label("AETHER HUNTER", 92, UIKit.GOLD)
@@ -219,8 +219,13 @@ func _confirm(text: String, yes: Callable) -> void:
 
 func _settings() -> void:
 	_clear()
+	var sc := ScrollContainer.new()
+	sc.custom_minimum_size = Vector2(900, 600)
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(sc)
 	var s := SettingsMenu.new()
-	box.add_child(s)
+	s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.add_child(s)
 	_btn("Back", _main)
 	_focus()
 

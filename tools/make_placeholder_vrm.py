@@ -224,6 +224,8 @@ def write_glb(path, fem, overlay=None, mat_name="PH_Body_SKIN", color=(0.9, 0.75
     col = np.concatenate([pos[:, 0:1] / 2 + 0.5, pos[:, 1:2] / 2, pos[:, 2:3] / 2 + 0.5, np.ones((len(pos), 1), np.float32)], 1).astype(np.float32)
     a_col = add(np.clip(col, 0, 1), 34962, typ="VEC4")
     a_j = add(joints, 34962, comp=5123, typ="VEC4"); a_w = add(weights, 34962, typ="VEC4")
+    # glTF front faces are counter-clockwise: reverse the builder's triangle order
+    idx = idx.reshape(-1, 3)[:, ::-1].reshape(-1).copy()
     a_idx = add(idx, 34963, comp=5125, typ="SCALAR")
     targets = []
     for k in ("Bust", "Muscle", "Weight"):

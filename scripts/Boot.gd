@@ -45,10 +45,10 @@ func _show_splash() -> void:
 	add_child(_splash)
 	var bg := ColorRect.new()
 	bg.color = Color("080b12")
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_splash.add_child(bg)
 	var v := UIKit.vbox(12)
-	v.set_anchors_preset(Control.PRESET_CENTER)
+	v.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	v.offset_left = -500
 	v.offset_right = 500
 	v.offset_top = -80

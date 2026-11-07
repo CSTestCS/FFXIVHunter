@@ -23,6 +23,8 @@ godot --headless --editor --quit --path .        # import / refresh class cache
 godot --headless --path . -- --check             # compile every script
 godot --headless --path . -- --smoke-test        # automated play-through
 python3 tools/check_unused.py                    # no unused scripts
+godot --path . -- --kit                          # mesh winding / normals check (needs a display)
+godot --path . --resolution 1125x609 -- --smoke-test --ui-shots --shots /tmp/ui   # every menu, for layout checks
 ```
 
 Visual check with screenshots (needs a GPU or software Vulkan + a display / xvfb):

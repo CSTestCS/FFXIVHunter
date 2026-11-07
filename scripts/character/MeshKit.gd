@@ -72,8 +72,8 @@ static func tube(st: SurfaceTool, a: Vector3, b: Vector3, ra: float, rb: float, 
 		var a1 := a + d1 * ra
 		var b0 := b + d0 * rb
 		var b1 := b + d1 * rb
-		_tri(st, a0, a1, b0, n0, n1, n0, col)
-		_tri(st, a1, b1, b0, n1, n1, n0, col)
+		_tri(st, a0, b0, a1, n0, n0, n1, col)
+		_tri(st, a1, b0, b1, n1, n0, n1, col)
 		if caps:
 			_tri(st, a, a0, a1, -dn, -dn, -dn, col)
 			if rb > 0.0005:
