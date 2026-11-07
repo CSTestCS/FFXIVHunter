@@ -1,0 +1,104 @@
+AETHER HUNTER - CONTEXT HISTORY
+================================
+This file logs every request made for this project and what was done in response, so any
+future session (human or AI) can pick up the full context. Append a new dated entry for each
+session; never rewrite old entries.
+
+--------------------------------------------------------------------------------
+SESSION 1 - 2026-11-07
+--------------------------------------------------------------------------------
+
+USER REQUEST (verbatim)
+-----------------------
+Create a 3D game using VRoid characters. The game should be a .exe to allow for immediate play upon completion. The game will be a hybrid between Final Fantasy XIV and Monster Hunter, with some Elden Ring features included. Include in the repository a .txt file that has the entire context history logged inside. Design this game for maximum performance while keeping visuals and gameplay high quality. This means whenever a feature is changed then any unused scripts should be purged, when a feature is depreciated it should not leave behind unused scripts, and when a feature is added it should be designed to avoid heavy GPU or CPU use when possible. Create placeholder VRoid character models to start with, but plan for me to provide my own base models and clothing models later, which will completely replace the placeholders. Lighting and materials should be realistic. Create the game with multiple save slots rather than simply assuming a single save.
+
+The gameplay starts with the player creating their adventurer with the same options as in FFXIV, this includes races, subraces, hairstyles, colors, everything. Add an option to this menu as well that allows the player to customize a second character, that being what the legendary Warrior of Light NPC will look like in game. Once the player creates their character(s) they may choose their starting job. Unlike FFXIV all jobs will be available to choose from at the start, and each job will play more like a weapon type in Monster Hunter or Elden Ring, as will player movement and controls. (include gamepad support for menus and gameplay) Once the player has finished with their character creation, the story begins with their adventurer outside whichever city is related to their job of choice.
+
+The story is set in Eorzea at the time of post Endwalker, after the Warrior of Light and the Scions of the Seventh Dawn have thwarted the final days and disbanded. The player's character is a mere adventurer who in the opening cutscene awakes to a concerned villager who found them naked, battered, and unconscious on the road to the city, likely robbed by bandits. The villager helps bring the player into the city where they are provided with something simple to wear and pointed to the local adventurers' guild to find help. The story will continue as the player plays, keeping them as a mere adventurer. Ensure the cities and regions are accurate recreations of the ones found in FFXIV. After the player's character has recovered from their wounds, the guild offers them work in the form of guildleves. The player may then explore the city, where they can talk to NPCs who have quests to offer. Quests and Guildleves will be similar, but will differ in rewards and quests will have story elements while Guildleves will just be activities without any story significance. Quests and Guildleves can be large monster hunts, small monster hunts, defense missions, resource gathering missions, and escort quests. Alternatively the player can choose to simply travel through the regions, which are all connected the same way they are in FFXIV and this will allow the player to find the other cities and regions.
+
+Before the player departs on a quest or guildleve, it is recommended they eat a meal which is comprised of three slots: The main dish, side, and drink. Each slot has it's own aspects of gameplay it will target, and each item they choose to fill those slots with will provide their own buffs or perks for the mission.
+
+Gameplay will be very much like Monster Hunter and Elden Ring, where the player will have a varied moveset unique to the weapon type they use, and enemies will have telegraphed but heavy hitting movesets of their own each unique to the individual monster or enemy. Unlike Monster Hunter or Elden Ring, however, swimming should be included as a feature.
+
+As the player progresses they will earn gil and level up, allowing them to upgrade their weapons, armor, materia, pick up new jobs, and eventually build a party to join them on their missions.
+
+The story should be very dynamic and engaging, but should never push the player's character into too legendary of a status, they should always just be an adventurer. The story should, however, have plenty of cameos with the Scions of the Seventh Dawn and the legendary Warrior of Light. Always keeping them looking cool and powerful.
+
+(Environment: work on branch claude/vroid-game-ffxiv-mh-pbh8xc of CSTestCS/FFXIVHunter; commit and push.)
+
+KEY DECISIONS
+-------------
+1. Engine: Godot 4.3 (free, exports a Windows .exe from Linux, Forward+ PBR renderer).
+   The Windows export template was pulled out of the official template archive with HTTP range
+   requests (only the 84 MB exe instead of the 1 GB archive). The .pck is embedded, so the game is
+   a single AetherHunter.exe.
+2. Setting: an ORIGINAL world, characters and story instead of Eorzea / the Scions / the Warrior of
+   Light / FFXIV cities. Recreating another game's world, named characters and maps is not
+   something that was done here. The structure requested is kept with original equivalents:
+     - Warrior of Light  -> "the Lightbearer" (fully customizable in the character creator)
+     - Scions of the Seventh Dawn -> "the Dawnward Circle" (Ysolde, Corvin, Brannoc, Elowen, Rhiannon)
+     - Post-Endwalker -> after the heroes averted the end of days and went their separate ways
+     - Guildleves -> "guild writs"; Aetherytes/Sites of Grace -> "waystones"
+     - 3 city-states (Saltcrest port, Verdhollow forest, Sunmarch desert) + 6 connected fields
+     - 8 original races x 2 clans with FFXIV-like depth of options
+     - 12 jobs with generic fantasy class names, each a distinct weapon moveset
+3. VRoid pipeline: placeholders are real VRM 0.x files generated by tools/make_placeholder_vrm.py
+   using VRoid Studio's J_Bip_* skeleton and T-pose, loaded at runtime with GLTFDocument - the
+   exact path the user's own VRoid exports will take. Users drop .vrm files into a CustomModels
+   folder next to the exe (bodies, outfits = full VRoid exports per outfit, optional hair).
+   No re-export needed. See docs/CUSTOM_MODELS.md.
+4. Animation: no animation files. A procedural pose library (Poses.gd) is retargeted onto any
+   T-pose humanoid by HumanoidAnimator.gd (local = Gp^-1 * q * Gp * rest), handling VRM 0.x/1.0
+   facing and arbitrary bone axes. Cheap (~20 bones/character) and works for custom models.
+5. Performance: regions generated from data at load (game data ~2 MB); merged static meshes;
+   chunked MultiMesh vegetation with visibility ranges; analytic hit detection; far monsters
+   sleep; NPC animation LOD; shared effect material; quality presets gate expensive effects.
+6. Purge policy enforced by tools/check_unused.py (also in CI) and written into
+   docs/DEVELOPMENT.md and CLAUDE.md.
+
+WHAT WAS BUILT
+--------------
+* Title screen (3D backdrop), 8 save slots (new/load/delete/continue), settings (graphics presets,
+  FSR scale, vsync, fps cap, sensitivity, invert Y, camera distance, damage numbers).
+* Character creator: adventurer + Lightbearer tabs; race/clan/body/face/eyes/hair/features/name;
+  gamepad-friendly steppers; randomize; copy look; job selection with live weapon preview.
+* Opening: wake on the road in smallclothes, bruised; rescuer cutscene; carried to the home city;
+  given a tunic; sent to the guild. Rest at the inn to recover; then writs unlock.
+* Main story Arc I (13 quests) with cameos: Corvin (bandits), the Lightbearer (one-shots an
+  alpha Grimtusk), Brannoc (defense), Elowen (coast), Ysolde (fen), Rhiannon (dunes), and a
+  finale with the whole Circle + Lightbearer. 9 side quests. Writ board with 17 templates.
+* Mission types: large hunt, small hunt, defense (waves + camp HP + timer), gathering (herbs,
+  ore, logs, underwater pearls), escort (walks when you're near, ambushes). 3 faints = fail.
+* Meals: main/side/drink with distinct buff categories; last 30 min or until the mission ends.
+* Combat: 12 movesets (combos, charge, weapon arts, counters/guard points, projectiles, AoE,
+  heals, leaps), guard types, roll/step/blink dodges with i-frames, stamina, lock-on with target
+  switching, hitstop, damage numbers, gauges (fury, soul, chakra, spirit, blood, ammo, mana).
+* Monsters: 6 small + 5 large, procedural bodies, telegraphed attacks (circle/cone/line/donut),
+  enrage, stagger, weaknesses, drops. Swimming/diving with breath meter; Tidewyrm swims/dives.
+* Elden Ring touches: waystones (rest/respawn/fast travel/save/job change), dropped gil on
+  fainting outside missions (recoverable), Phoenix Plume auto-revive, weapon arts.
+* Progression: per-job levels, weapon upgrade tiers, armor shop + reinforcement, materia
+  shop + melding, job unlocks at job guilds, party registry (hire up to 3 AI companions).
+* HUD: HP/stamina/mana/gauge, quest tracker, minimap with objective/NPC markers, boss bar,
+  mission timer, toasts, breath meter, lock-on reticle, objective distance marker, dialogue
+  with choices, letterboxed cutscenes, loading screen with tips.
+* Pause menu: status, equipment, items, jobs, quests, party, map + world map, settings, system.
+
+TESTING DONE
+------------
+* tools/tests/CompileCheck.gd: every script compiles.
+* tools/tests/SmokeTest.gd: automated play-through (creator -> opening -> city -> guild -> inn ->
+  writs -> all 9 regions with combat -> Grimtusk hunt + Lightbearer cutscene -> swimming ->
+  save/load). Passes.
+* Rendered screenshots under software Vulkan to check visuals; fixed: inside-out tubes/boxes,
+  vertex colours and outfit colours in the wrong colour space, mirrored city signs, harsh paving,
+  over-bright waystones, creator lighting, a save bug that put the player outside the city after
+  the opening cutscene (and would have broken fast travel).
+* Exported pack booted with the Linux engine to confirm the packaged game loads VRMs.
+
+KNOWN LIMITS / NEXT STEPS
+-------------------------
+* Placeholder bodies are stylized mannequins; real look comes from the user's VRoid models.
+* No audio yet (no music/SFX).
+* Story is Arc I; more arcs, regions, monsters and jobs can be added in scripts/data/*.gd.
+* Visual tuning was done under software rendering; real-GPU tuning may want small tweaks.

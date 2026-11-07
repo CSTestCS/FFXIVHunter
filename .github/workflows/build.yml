@@ -1,0 +1,44 @@
+name: Build & test
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GODOT: "4.3-stable"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot ${{ env.GODOT }} and export templates
+        run: |
+          mkdir -p ~/godot ~/.local/share/godot/export_templates/4.3.stable
+          cd ~/godot
+          curl -sSLo godot.zip https://github.com/godotengine/godot/releases/download/${GODOT}/Godot_v${GODOT}_linux.x86_64.zip
+          unzip -q godot.zip
+          mv Godot_v${GODOT}_linux.x86_64 godot
+          curl -sSLo templates.tpz https://github.com/godotengine/godot/releases/download/${GODOT}/Godot_v${GODOT}_export_templates.tpz
+          unzip -q -j templates.tpz "templates/windows_release_x86_64.exe" "templates/windows_debug_x86_64.exe" "templates/version.txt" -d ~/.local/share/godot/export_templates/4.3.stable
+          rm templates.tpz
+
+      - name: No unused scripts
+        run: python3 tools/check_unused.py
+
+      - name: Import, compile check, smoke test
+        run: |
+          ~/godot/godot --headless --editor --quit --path . || true
+          ~/godot/godot --headless --path . -- --check
+          timeout 900 ~/godot/godot --headless --path . -- --smoke-test
+
+      - name: Export Windows .exe
+        run: |
+          mkdir -p build
+          ~/godot/godot --headless --path . --export-release "Windows Desktop" build/AetherHunter.exe
+          ls -la build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AetherHunter-windows
+          path: build/AetherHunter.exe
